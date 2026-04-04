@@ -27,7 +27,8 @@ out/
 
 # Chroma / local data
 backend/data/chroma/
-backend/data/regulatory_pdfs/*.pdf
+backend/chroma_db/
+backend/data/regulatory_pdfs/**/*.pdf
 
 # OS
 .DS_Store

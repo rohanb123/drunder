@@ -4,7 +4,7 @@ One-time / repeatable ingest: FDA, CPSC, and FTC PDFs under data/regulatory_pdfs
 
 - PyMuPDF extracts text per page; text is chunked and embedded with sentence-transformers
   (all-MiniLM-L6-v2 by default).
-- Vectors + citation metadata persist in local ChromaDB (data/chroma/).
+- Vectors + citation metadata persist in local ChromaDB (chroma_db/ at backend root).
 
 Layout (recommended):
   data/regulatory_pdfs/fda/*.pdf
@@ -20,6 +20,7 @@ Run from the backend directory:
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -34,6 +35,10 @@ from app.services.regulatory_paths import resolve_under_backend  # noqa: E402
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
     parser = argparse.ArgumentParser(description="Ingest regulatory PDFs into local ChromaDB.")
     parser.add_argument(
         "--reset",

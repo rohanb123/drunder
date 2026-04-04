@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     gemini_sanctions_model: str = "gemini-2.5-flash-lite"
     gemini_regulatory_model: str = "gemini-2.5-flash-lite"
     # Regulatory RAG (paths relative to backend/ unless absolute)
-    regulatory_chroma_path: str = "data/chroma"
+    regulatory_chroma_path: str = "chroma_db"
     regulatory_pdfs_path: str = "data/regulatory_pdfs"
     regulatory_collection_name: str = "clearpath_regulatory"
     regulatory_embedding_model: str = "all-MiniLM-L6-v2"

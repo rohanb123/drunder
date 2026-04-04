@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Strips "Made-with: Cursor" from commit messages. Enable: git config core.hooksPath .githooks
+msg_file=$1
+[ -n "$msg_file" ] && [ -f "$msg_file" ] || exit 0
+dir=$(dirname "$msg_file")
+tmp="$dir/.commit-msg-strip.$$"
+grep -vE '^[Mm]ade-[Ww]ith:[[:space:]]*[Cc]ursor[[:space:]]*$' "$msg_file" > "$tmp" && mv "$tmp" "$msg_file"

@@ -1,4 +1,4 @@
-"""PDF text extraction (PyMuPDF), chunking, and metadata for regulatory RAG."""
+"""PDF text extraction (PyMuPDF), token chunking, and metadata for regulatory RAG."""
 
 from __future__ import annotations
 
@@ -8,24 +8,20 @@ from typing import Any
 
 import fitz  # PyMuPDF
 
-# Character-based chunks; guidance PDFs are often dense — ~900 chars with overlap.
-_CHUNK_CHARS = 900
-_CHUNK_OVERLAP = 120
+# Match all-MiniLM-L6-v2 context (~512); overlap preserves continuity at boundaries.
+_CHUNK_TOKENS = 500
+_OVERLAP_TOKENS = 50
+_MIN_CHUNK_TOKENS = 24
 
 _AGENCY_ALIASES = {"fda", "cpsc", "ftc"}
 
 
-def chunk_text(text: str, chunk_size: int = _CHUNK_CHARS, overlap: int = _CHUNK_OVERLAP) -> list[str]:
-    cleaned = " ".join(text.split())
-    if not cleaned:
-        return []
-    chunks: list[str] = []
-    step = max(chunk_size - overlap, 1)
-    for i in range(0, len(cleaned), step):
-        piece = cleaned[i : i + chunk_size].strip()
-        if len(piece) >= 40:
-            chunks.append(piece)
-    return chunks
+def load_embedding_tokenizer(model_name: str = "all-MiniLM-L6-v2"):
+    """Tokenizer aligned with sentence-transformers embedding model (for token-sized chunks)."""
+    from transformers import AutoTokenizer
+
+    tid = model_name if "/" in model_name else f"sentence-transformers/{model_name}"
+    return AutoTokenizer.from_pretrained(tid)
 
 
 def extract_pdf_pages(pdf_path: Path) -> list[tuple[int, str]]:
@@ -65,33 +61,134 @@ def guess_cfr_from_filename(stem: str) -> str | None:
     return None
 
 
+def _build_page_boundaries(pages: list[tuple[int, str]]) -> tuple[str, list[tuple[int, int, int]]]:
+    """Full document text and [(char_start, char_end, page_num), ...] per page body."""
+    parts: list[str] = []
+    boundaries: list[tuple[int, int, int]] = []
+    pos = 0
+    first = True
+    for page_num, raw in pages:
+        text = (raw or "").strip()
+        if not text:
+            continue
+        if not first:
+            sep = "\n\n"
+            parts.append(sep)
+            pos += len(sep)
+        first = False
+        start = pos
+        parts.append(text)
+        pos += len(text)
+        boundaries.append((start, pos, page_num))
+    return ("".join(parts), boundaries)
+
+
+def _pages_touching_range(boundaries: list[tuple[int, int, int]], c0: int, c1: int) -> tuple[int, int]:
+    pages: list[int] = []
+    for start, end, page in boundaries:
+        if end > c0 and start < c1:
+            pages.append(page)
+    if not pages:
+        return (1, 1)
+    return (min(pages), max(pages))
+
+
+def chunk_document_tokens(
+    full_text: str,
+    boundaries: list[tuple[int, int, int]],
+    tokenizer,
+    *,
+    chunk_tokens: int = _CHUNK_TOKENS,
+    overlap_tokens: int = _OVERLAP_TOKENS,
+    min_tokens: int = _MIN_CHUNK_TOKENS,
+) -> list[tuple[str, int, int]]:
+    """Sliding token windows over the full document; returns (chunk_text, page_start, page_end)."""
+    if not full_text.strip():
+        return []
+    enc = tokenizer(
+        full_text,
+        return_offsets_mapping=True,
+        add_special_tokens=False,
+        truncation=False,
+    )
+    input_ids: list[int] = enc["input_ids"]
+    offsets: list[tuple[int, int]] = enc["offset_mapping"]
+    if not input_ids or len(input_ids) != len(offsets):
+        return []
+
+    step = max(chunk_tokens - overlap_tokens, 1)
+    out: list[tuple[str, int, int]] = []
+
+    # Short documents: one chunk even if below min_tokens (still fits the embedder's max length).
+    if len(input_ids) < min_tokens:
+        window_ids = input_ids
+        window_offsets = offsets
+        c0 = window_offsets[0][0]
+        c1 = window_offsets[-1][1]
+        p0, p1 = _pages_touching_range(boundaries, c0, c1)
+        chunk_text = tokenizer.decode(window_ids, skip_special_tokens=True).strip()
+        if len(chunk_text) >= 8:
+            out.append((chunk_text, p0, p1))
+        return out
+
+    i = 0
+    while i < len(input_ids):
+        window_ids = input_ids[i : i + chunk_tokens]
+        if len(window_ids) < min_tokens:
+            break
+        window_offsets = offsets[i : i + chunk_tokens]
+        c0 = window_offsets[0][0]
+        c1 = window_offsets[-1][1]
+        p0, p1 = _pages_touching_range(boundaries, c0, c1)
+        chunk_text = tokenizer.decode(window_ids, skip_special_tokens=True).strip()
+        if len(chunk_text) >= 20:
+            out.append((chunk_text, p0, p1))
+        i += step
+    return out
+
+
 def pdf_to_chunks(
     pdf_path: Path,
     regulatory_root: Path,
+    tokenizer,
+    *,
+    chunk_tokens: int = _CHUNK_TOKENS,
+    overlap_tokens: int = _OVERLAP_TOKENS,
 ) -> list[tuple[str, dict[str, Any]]]:
     """
-    Returns list of (chunk_text, metadata) with string values suitable for ChromaDB.
+    Extract PDF text, chunk by embedding-model tokens with overlap, attach citation metadata.
     """
     agency = infer_agency(pdf_path, regulatory_root)
+    document_name = pdf_path.name
     doc_id = pdf_path.stem
     title = pdf_path.stem.replace("_", " ")
     cfr_guess = guess_cfr_from_filename(pdf_path.stem)
     rel = str(pdf_path.resolve().relative_to(regulatory_root.resolve()))
 
-    rows: list[tuple[str, dict[str, Any]]] = []
     pages = extract_pdf_pages(pdf_path)
-    chunk_idx = 0
-    for page_num, page_text in pages:
-        for part in chunk_text(page_text):
-            meta = {
-                "source_agency": agency,
-                "document_id": doc_id,
-                "title": title[:500],
-                "source_file": rel[:500],
-                "page_start": str(page_num),
-                "chunk_index": str(chunk_idx),
-                "cfr_citation": (cfr_guess or "")[:200],
-            }
-            rows.append((part, meta))
-            chunk_idx += 1
+    full_text, boundaries = _build_page_boundaries(pages)
+    if not full_text.strip():
+        return []
+
+    spans = chunk_document_tokens(
+        full_text,
+        boundaries,
+        tokenizer,
+        chunk_tokens=chunk_tokens,
+        overlap_tokens=overlap_tokens,
+    )
+    rows: list[tuple[str, dict[str, Any]]] = []
+    for chunk_idx, (part, p0, p1) in enumerate(spans):
+        meta = {
+            "source_agency": agency,
+            "document_name": document_name[:500],
+            "document_id": doc_id,
+            "title": title[:500],
+            "source_file": rel[:500],
+            "page_start": str(p0),
+            "page_end": str(p1),
+            "chunk_index": str(chunk_idx),
+            "cfr_citation": (cfr_guess or "")[:200],
+        }
+        rows.append((part, meta))
     return rows

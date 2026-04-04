@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -10,7 +11,9 @@ from typing import Any
 
 import chromadb
 
-from app.services.regulatory_index import pdf_to_chunks
+from app.services.regulatory_index import load_embedding_tokenizer, pdf_to_chunks
+
+logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL_DEFAULT = "all-MiniLM-L6-v2"
 
@@ -79,6 +82,17 @@ def _stable_chunk_id(rel_key: str, doc_id: str, page: str, chunk_index: str) -> 
     return raw[:512]
 
 
+def _delete_by_source_file(collection: Any, rel: str) -> None:
+    """Remove prior chunks for this PDF so re-ingest does not duplicate rows."""
+    try:
+        collection.delete(where={"source_file": rel})
+    except Exception:
+        try:
+            collection.delete(where={"source_file": {"$eq": rel}})
+        except Exception as exc:
+            logger.warning("Could not delete existing chunks for %s: %s", rel, exc)
+
+
 def run_regulatory_ingest(
     pdf_root: Path,
     chroma_dir: Path,
@@ -88,7 +102,8 @@ def run_regulatory_ingest(
     reset_collection: bool = False,
 ) -> int:
     """
-    Extract all PDFs under pdf_root, chunk, embed, write to Chroma. Returns chunk count.
+    Extract all PDFs under pdf_root, chunk, embed, write to Chroma. Returns total chunk count.
+    Idempotent per document: existing rows for each source_file are replaced on re-run.
     """
     pdf_root = pdf_root.resolve()
     chroma_dir = Path(chroma_dir)
@@ -106,34 +121,47 @@ def run_regulatory_ingest(
         metadata={"hnsw:space": "cosine"},
     )
 
-    all_ids: list[str] = []
-    all_docs: list[str] = []
-    all_meta: list[dict[str, Any]] = []
+    tokenizer = load_embedding_tokenizer(embedding_model_name)
+    model = _get_sentence_transformer(embedding_model_name)
+    batch_size = 32
 
     pdfs = sorted(pdf_root.rglob("*.pdf"))
+    total = 0
     for pdf_path in pdfs:
         try:
             rel = str(pdf_path.resolve().relative_to(pdf_root))
         except ValueError:
             rel = pdf_path.name
-        for text, meta in pdf_to_chunks(pdf_path, pdf_root):
+
+        if not reset_collection:
+            _delete_by_source_file(collection, rel)
+
+        all_ids: list[str] = []
+        all_docs: list[str] = []
+        all_meta: list[dict[str, Any]] = []
+
+        for text, meta in pdf_to_chunks(pdf_path, pdf_root, tokenizer):
             cid = _stable_chunk_id(rel, meta["document_id"], meta["page_start"], meta["chunk_index"])
             meta_str = {k: str(v) if v is not None else "" for k, v in meta.items()}
             all_ids.append(cid)
             all_docs.append(text)
             all_meta.append(meta_str)
 
-    if not all_ids:
-        return 0
+        n_doc = len(all_ids)
+        if n_doc == 0:
+            logger.info("Ingest: %s — 0 chunks (empty or unreadable)", pdf_path.name)
+            continue
 
-    model = _get_sentence_transformer(embedding_model_name)
-    batch_size = 32
-    for start in range(0, len(all_ids), batch_size):
-        end = start + batch_size
-        b_ids = all_ids[start:end]
-        b_docs = all_docs[start:end]
-        b_meta = all_meta[start:end]
-        b_emb = model.encode(b_docs, convert_to_numpy=True).tolist()
-        collection.upsert(ids=b_ids, documents=b_docs, metadatas=b_meta, embeddings=b_emb)
+        for start in range(0, n_doc, batch_size):
+            end = start + batch_size
+            b_ids = all_ids[start:end]
+            b_docs = all_docs[start:end]
+            b_meta = all_meta[start:end]
+            b_emb = model.encode(b_docs, convert_to_numpy=True).tolist()
+            collection.upsert(ids=b_ids, documents=b_docs, metadatas=b_meta, embeddings=b_emb)
 
-    return len(all_ids)
+        total += n_doc
+        logger.info("Ingest: %s — stored %s chunk(s)", pdf_path.name, n_doc)
+
+    logger.info("Ingest finished: %s chunk(s) across %s PDF file(s)", total, len(pdfs))
+    return total
