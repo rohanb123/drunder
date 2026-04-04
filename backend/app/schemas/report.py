@@ -8,12 +8,14 @@ class SupplierInput(BaseModel):
 
     name: str = Field(..., description="Legal or trade name to screen")
     country_of_origin: str = Field(
-        ...,
-        description="ISO country name or code as provided (normalized in tariff service)",
+        default="",
+        description="Country of origin when provided by the CSV (optional for screening)",
     )
 
 
 class ReportRequest(BaseModel):
+    """Inbound payload: product context plus suppliers to screen."""
+
     product_description: str = Field(..., min_length=1, description="What you sell")
     suppliers: list[SupplierInput] = Field(..., min_length=1)
 
@@ -30,21 +32,14 @@ class SupplierRiskResult(BaseModel):
     supplier_name: str
     status: Literal["clear", "review", "flagged"]
     match: MatchedListEntry | None = None
-    fuzzy_score: float | None = Field(None, description="rapidfuzz ratio when applicable")
+    fuzzy_score: float | None = Field(None, description="Similarity score when fuzzy matching is used")
     notes: str | None = None
-
-
-class TariffExposureResult(BaseModel):
-    supplier_name: str
-    country_of_origin: str
-    hts_chapter: str = Field(..., description="4-digit HTS chapter from classification")
-    duty_rate_percent: float | None = Field(None, description="From Trade.gov Tariff Rates API")
-    api_source: str = Field(default="trade.gov_tariff_rates", description="Provenance label")
 
 
 class RegulatoryCitation(BaseModel):
     title: str
     source: str = Field(..., description="Agency: FDA | CPSC | FTC")
+    cfr_citation: str | None = Field(None, description="CFR reference from chunk metadata when available")
     document_id: str | None = None
     chunk_id: str | None = None
 
@@ -59,7 +54,8 @@ class RegulatorySection(BaseModel):
 
 
 class ReportResponse(BaseModel):
+    """Unified compliance report: sanctions screening + regulatory synthesis."""
+
     product_description: str
     supplier_risk: list[SupplierRiskResult]
-    tariff_exposure: list[TariffExposureResult]
     regulatory: RegulatorySection

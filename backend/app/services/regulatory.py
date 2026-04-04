@@ -1,36 +1,56 @@
 """
-Section 3 — Regulatory compliance (children's products scope).
+Section 3 — Regulatory RAG: local ChromaDB + sentence-transformers + Gemini synthesis.
 
-Flow (to implement): ingest FDA/CPSC/FTC PDFs with PyMuPDF → chunk + embed (sentence-transformers)
-into ChromaDB → retrieve top-k → Gemini synthesis with citations from chunk metadata only.
+Setup (once): `python -m scripts.ingest_regulatory` after placing PDFs under data/regulatory_pdfs/.
 """
 
+from __future__ import annotations
+
+import asyncio
+
 from app.config import get_settings
-from app.schemas.report import RegulatoryCitation, RegulatorySection
+from app.schemas.report import RegulatorySection
+from app.services.regulatory_chroma import query_regulatory_chunks
+from app.services.regulatory_gemini import citations_from_chunks, synthesize_regulatory_section
+from app.services.regulatory_paths import resolve_under_backend
+
+
+def _run_regulatory_rag_sync(product_description: str) -> RegulatorySection:
+    settings = get_settings()
+    chroma_dir = resolve_under_backend(settings.regulatory_chroma_path)
+
+    chunks = query_regulatory_chunks(
+        product_description.strip(),
+        chroma_dir=chroma_dir,
+        collection_name=settings.regulatory_collection_name,
+        embedding_model_name=settings.regulatory_embedding_model,
+        k=8,
+    )
+
+    gkey = (settings.google_api_key or "").strip()
+    if not gkey:
+        if not chunks:
+            return synthesize_regulatory_section(product_description, [], api_key="")
+        return RegulatorySection(
+            summary=(
+                "Retrieved top guidance excerpts from the local index, but GOOGLE_API_KEY is not set; "
+                "Gemini synthesis is skipped. Use citations below (from chunk metadata)."
+            ),
+            applicable_regulations=[],
+            testing_requirements=[],
+            estimated_compliance_cost_usd=None,
+            penalty_exposure_note=None,
+            citations=citations_from_chunks(chunks),
+        )
+
+    return synthesize_regulatory_section(
+        product_description,
+        chunks,
+        api_key=gkey,
+        model=settings.gemini_regulatory_model,
+    )
 
 
 async def run_regulatory_rag(product_description: str) -> RegulatorySection:
-    """
-    RAG over local ChromaDB; Gemini reads only retrieved chunks + metadata.
-
-    Stub: empty citations until `scripts/ingest_regulatory.py` has been run and Chroma populated.
-    """
-    _ = get_settings()
-    return RegulatorySection(
-        summary=(
-            f"Stub regulatory synthesis for: {product_description[:200]!r}… "
-            "Run PDF ingest and Chroma indexing; then query + Gemini Flash here."
-        ),
-        applicable_regulations=[],
-        testing_requirements=[],
-        estimated_compliance_cost_usd=None,
-        penalty_exposure_note=None,
-        citations=[
-            RegulatoryCitation(
-                title="Placeholder — ingest guidance PDFs and store metadata on each chunk",
-                source="CPSC",
-                document_id=None,
-                chunk_id=None,
-            )
-        ],
-    )
+    """Embed query → Chroma top-8 → Gemini structured section (sync work off the event loop)."""
+    return await asyncio.to_thread(_run_regulatory_rag_sync, product_description)

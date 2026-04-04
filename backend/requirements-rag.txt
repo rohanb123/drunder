@@ -1,5 +1,2 @@
-# Install when implementing ingest + ChromaDB retrieval (large: torch, etc.)
+# RAG deps are included in requirements.txt. This file remains as a compatibility alias.
 -r requirements.txt
-chromadb>=0.4.22
-sentence-transformers>=2.3.0
-PyMuPDF>=1.23.0

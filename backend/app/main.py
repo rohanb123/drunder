@@ -7,9 +7,10 @@ from app.schemas.report import ReportRequest, ReportResponse
 from app.services.orchestrator import build_unified_report
 from app.services.report_pdf import build_report_pdf
 
+
 app = FastAPI(
     title="Clearpath API",
-    description="Unified supplier sanctions, tariff, and US regulatory compliance report.",
+    description="Supplier sanctions screening and US regulatory compliance report.",
     version="0.1.0",
 )
 
@@ -30,10 +31,10 @@ async def health() -> dict[str, str]:
 
 @app.post("/report", response_model=ReportResponse)
 async def create_report(body: ReportRequest) -> ReportResponse:
-    """Single endpoint: product + suppliers → unified JSON report (three sections in parallel)."""
+    """Product + suppliers → sanctions screening + regulatory section (unified JSON)."""
     try:
         return await build_unified_report(body)
-    except Exception as e:  # noqa: BLE001 — tighten once pipelines are real
+    except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

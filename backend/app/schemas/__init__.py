@@ -4,7 +4,6 @@ from .report import (
     RegulatorySection,
     SupplierInput,
     SupplierRiskResult,
-    TariffExposureResult,
 )
 
 __all__ = [
@@ -13,5 +12,4 @@ __all__ = [
     "RegulatorySection",
     "SupplierInput",
     "SupplierRiskResult",
-    "TariffExposureResult",
 ]
