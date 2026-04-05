@@ -83,7 +83,7 @@ def classify_supplier_from_csl_results(
                 status="flagged",
                 match=_hit_to_match(hit),
                 fuzzy_score=None,
-                notes="This name matches a U.S. sanctions list entry (including aliases).",
+                notes=None,
             )
 
     first = _first_valid_hit(raw_results)

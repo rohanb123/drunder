@@ -10,12 +10,7 @@ export function SentinelApp() {
 
   return (
     <div className="min-h-screen bg-zinc-100 text-zinc-900">
-      <SentinelHeader
-        tab={s.tab}
-        onTab={s.setTab}
-        onUnifiedPdf={() => void s.requestUnifiedPdfFromHeader()}
-        unifiedPdfBusy={s.compliancePdfLoading}
-      />
+      <SentinelHeader tab={s.tab} onTab={s.setTab} whatIfUnlocked={s.complianceReport != null} />
       <main className="mx-auto max-w-7xl px-6 py-8">
         {s.tab === "compliance" && (
           <ComplianceTab
@@ -49,6 +44,10 @@ export function SentinelApp() {
             result={s.result}
             streamErr={s.streamErr}
             parseErr={s.parseErr}
+            onUnifiedPdf={() => void s.requestUnifiedPdf()}
+            unifiedPdfBusy={s.compliancePdfLoading}
+            showUnifiedPdfButton={s.whatIfRunCompleted}
+            complianceError={s.complianceError}
           />
         )}
       </main>

@@ -3,9 +3,9 @@
 import { postReport, postReportPdf } from "@/lib/api";
 import type { ProfileContext, SimulationResult } from "@/lib/simulation-types";
 import { streamSimulation } from "@/lib/simulation";
-import type { ReportRequest, ReportResponse, SupplierInput } from "@/lib/types";
+import type { ReportPdfRequest, ReportRequest, ReportResponse, SupplierInput } from "@/lib/types";
 import Papa from "papaparse";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SentinelTab } from "./SentinelHeader";
 
 const emptySupplier = (): SupplierInput => ({ name: "" });
@@ -25,7 +25,7 @@ function buildComplianceRequest(
 }
 
 export function useSentinelState() {
-  const [tab, setTab] = useState<SentinelTab>("compliance");
+  const [tab, setTabInner] = useState<SentinelTab>("compliance");
 
   const [whatIfSuppliers, setWhatIfSuppliers] = useState([emptyBaselineRow()]);
 
@@ -35,6 +35,7 @@ export function useSentinelState() {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [streamErr, setStreamErr] = useState<string | null>(null);
   const [parseErr, setParseErr] = useState<string | null>(null);
+  const [whatIfRunCompleted, setWhatIfRunCompleted] = useState(false);
 
   const [complianceProduct, setComplianceProduct] = useState("");
   const [complianceSuppliers, setComplianceSuppliers] = useState<SupplierInput[]>([emptySupplier()]);
@@ -42,6 +43,20 @@ export function useSentinelState() {
   const [complianceLoading, setComplianceLoading] = useState(false);
   const [compliancePdfLoading, setCompliancePdfLoading] = useState(false);
   const [complianceError, setComplianceError] = useState<string | null>(null);
+
+  const setTab = useCallback(
+    (t: SentinelTab) => {
+      if (t === "whatif" && !complianceReport) return;
+      setTabInner(t);
+    },
+    [complianceReport],
+  );
+
+  useEffect(() => {
+    if (!complianceReport && tab === "whatif") {
+      setTabInner("compliance");
+    }
+  }, [complianceReport, tab]);
 
   const ctx = useMemo(
     (): ProfileContext => ({
@@ -87,6 +102,7 @@ export function useSentinelState() {
       setStreamErr(e instanceof Error ? e.message : "Request failed");
     } finally {
       setStreaming(false);
+      setWhatIfRunCompleted(true);
     }
   }, [ctx, event]);
 
@@ -129,6 +145,10 @@ export function useSentinelState() {
     try {
       const r = await postReport(body);
       setComplianceReport(r);
+      const fromReport = r.supplier_risk
+        .map((x) => ({ name: x.supplier_name.trim() }))
+        .filter((x) => x.name);
+      setWhatIfSuppliers(fromReport.length ? fromReport : [emptyBaselineRow()]);
     } catch (e) {
       setComplianceError(e instanceof Error ? e.message : "Request failed");
     } finally {
@@ -159,14 +179,57 @@ export function useSentinelState() {
     }
   }, [complianceProduct, complianceSuppliers]);
 
-  const requestUnifiedPdfFromHeader = useCallback(() => {
-    setTab("compliance");
-    void downloadCompliancePdf();
-  }, [downloadCompliancePdf]);
+  const downloadUnifiedPdf = useCallback(async () => {
+    setComplianceError(null);
+    const body = buildComplianceRequest(complianceProduct, complianceSuppliers);
+    if (!body) {
+      setComplianceError("Add a product description and at least one supplier name.");
+      return;
+    }
+    const payload: ReportPdfRequest = {
+      ...body,
+      what_if: {
+        scenario_prompt: event.trim(),
+        narrative: narrative.trim(),
+        compliance_blockers: (result?.complianceBlockers ?? []).map((b) => ({
+          title: b.title,
+          detail: b.detail,
+          severity: b.severity,
+        })),
+      },
+    };
+    setCompliancePdfLoading(true);
+    try {
+      const blob = await postReportPdf(payload);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "clearpath-unified-report.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setComplianceError(e instanceof Error ? e.message : "PDF failed");
+    } finally {
+      setCompliancePdfLoading(false);
+    }
+  }, [complianceProduct, complianceSuppliers, event, narrative, result]);
+
+  const requestUnifiedPdf = useCallback(() => {
+    void downloadUnifiedPdf();
+  }, [downloadUnifiedPdf]);
 
   const clearComplianceReport = useCallback(() => {
     setComplianceReport(null);
     setComplianceError(null);
+    setComplianceProduct("");
+    setComplianceSuppliers([emptySupplier()]);
+    setWhatIfSuppliers([emptyBaselineRow()]);
+    setEvent("");
+    setNarrative("");
+    setResult(null);
+    setStreamErr(null);
+    setParseErr(null);
+    setWhatIfRunCompleted(false);
   }, []);
 
   return {
@@ -198,6 +261,7 @@ export function useSentinelState() {
     complianceError,
     runComplianceReport,
     downloadCompliancePdf,
-    requestUnifiedPdfFromHeader,
+    requestUnifiedPdf,
+    whatIfRunCompleted,
   };
 }

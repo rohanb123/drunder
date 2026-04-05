@@ -16,6 +16,28 @@ class ReportRequest(BaseModel):
     suppliers: list[SupplierInput] = Field(..., min_length=1)
 
 
+class WhatIfComplianceBlockerPdf(BaseModel):
+    title: str = ""
+    detail: str = ""
+    severity: Literal["high", "medium", "low"] = "medium"
+
+
+class WhatIfPdfSection(BaseModel):
+    """Optional appendix for unified PDF: scenario + model output from the Sentinel what-if flow."""
+
+    scenario_prompt: str = ""
+    narrative: str = ""
+    compliance_blockers: list[WhatIfComplianceBlockerPdf] = Field(default_factory=list)
+
+
+class ReportPdfRequest(BaseModel):
+    """POST /report/pdf body: same as ReportRequest plus optional what-if appendix."""
+
+    product_description: str = Field(..., min_length=1, description="What you sell")
+    suppliers: list[SupplierInput] = Field(..., min_length=1)
+    what_if: WhatIfPdfSection | None = None
+
+
 class MatchedListEntry(BaseModel):
     source_list: str
     entity_type: str | None = None

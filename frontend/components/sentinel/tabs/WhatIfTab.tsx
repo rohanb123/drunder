@@ -19,6 +19,10 @@ type Props = {
   result: SimulationResult | null;
   streamErr: string | null;
   parseErr: string | null;
+  onUnifiedPdf: () => void;
+  unifiedPdfBusy?: boolean;
+  showUnifiedPdfButton: boolean;
+  complianceError: string | null;
 };
 
 export function WhatIfTab({
@@ -34,11 +38,33 @@ export function WhatIfTab({
   result,
   streamErr,
   parseErr,
+  onUnifiedPdf,
+  unifiedPdfBusy = false,
+  showUnifiedPdfButton,
+  complianceError,
 }: Props) {
   const canRun = Boolean(event.trim());
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
+      {complianceError && (
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">
+          {complianceError}
+        </p>
+      )}
+      {showUnifiedPdfButton && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            disabled={unifiedPdfBusy}
+            onClick={onUnifiedPdf}
+            className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-zinc-800 disabled:opacity-60"
+          >
+            <span aria-hidden>📄</span>
+            {unifiedPdfBusy ? "PDF…" : "Generate unified PDF"}
+          </button>
+        </div>
+      )}
       <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h2 className="text-sm font-bold uppercase tracking-wide text-zinc-500">Baseline supply chain</h2>
         <p className="mt-1 text-xs text-zinc-500">Optional supplier names for context. You can run a scenario with none.</p>

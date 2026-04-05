@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from io import BytesIO
 from xml.sax.saxutils import escape
 
@@ -9,9 +10,9 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import ListFlowable, ListItem, PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
-from app.schemas.report import ReportResponse, RegulatoryBullet, SupplierRiskResult
+from app.schemas.report import ReportResponse, RegulatoryBullet, SupplierRiskResult, WhatIfPdfSection
 
 _STATUS_ORDER = {"flagged": 0, "review": 1, "clear": 2}
 
@@ -32,6 +33,43 @@ def _para(text: str, style) -> Paragraph:
     return Paragraph(safe, style)
 
 
+def _strip_markdown_for_pdf(s: str) -> str:
+    """Turn common LLM markdown into plain text suitable for ReportLab Paragraph."""
+    if not s:
+        return ""
+    t = s.replace("\r\n", "\n").replace("\r", "\n")
+    t = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", t)
+    t = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", t)
+    for _ in range(5):
+        n = re.sub(r"\*\*([^*]+?)\*\*", r"\1", t)
+        n = re.sub(r"__([^_]+?)__", r"\1", n)
+        if n == t:
+            break
+        t = n
+    t = re.sub(r"`([^`]+)`", r"\1", t)
+    t = re.sub(r"(?<![*])\*([^*\n]+?)\*(?![*])", r"\1", t)
+    t = re.sub(r"(?<![_])_([^_\n]+?)_(?![_])", r"\1", t)
+    out_lines: list[str] = []
+    for line in t.split("\n"):
+        line = re.sub(r"^>\s?", "", line)
+        line = re.sub(r"^#{1,6}\s*", "", line)
+        m = re.match(r"^(\s*)[*\-]\s+(.*)$", line)
+        if m:
+            line = f"{m.group(1)}• {m.group(2)}"
+        else:
+            mnum = re.match(r"^(\s*)\d+\.\s+(.*)$", line)
+            if mnum:
+                line = f"{mnum.group(1)}• {mnum.group(2)}"
+        if re.fullmatch(r"[\s*_\-]{3,}", line or ""):
+            continue
+        out_lines.append(line)
+    return "\n".join(out_lines)
+
+
+def _para_markdown(text: str, style) -> Paragraph:
+    return _para(_strip_markdown_for_pdf(text), style)
+
+
 def _bullet_flowables(
     bullets: list[RegulatoryBullet],
     body_style,
@@ -40,7 +78,7 @@ def _bullet_flowables(
     """ListItem paragraphs for regulatory bullets; append source refs when chunk ids exist."""
     items: list[ListItem] = []
     for b in bullets:
-        line = escape(b.text or "")
+        line = escape(_strip_markdown_for_pdf(b.text or ""))
         labels: list[str] = []
         for cid in b.citation_chunk_ids:
             lab = cite_labels.get(cid)
@@ -53,8 +91,15 @@ def _bullet_flowables(
     return items
 
 
-def build_report_pdf(report: ReportResponse) -> bytes:
-    """Full report: product, supplier screening, regulatory section and sources."""
+def _truncate_pdf_text(s: str, max_len: int) -> str:
+    t = (s or "").strip()
+    if len(t) <= max_len:
+        return t
+    return t[: max_len - 3] + "..."
+
+
+def build_report_pdf(report: ReportResponse, what_if: WhatIfPdfSection | None = None) -> bytes:
+    """Full report: product, supplier screening, regulatory section and sources; optional what-if appendix."""
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -120,7 +165,7 @@ def build_report_pdf(report: ReportResponse) -> bytes:
         name = escape(r.supplier_name or "")
         story.append(Paragraph(f"<b>{name}</b> — <i>{status}</i>", body))
         if r.notes:
-            story.append(_para(r.notes, small))
+            story.append(_para_markdown(r.notes, small))
         m = r.match
         if m:
             story.append(
@@ -139,7 +184,7 @@ def build_report_pdf(report: ReportResponse) -> bytes:
     cite_labels = {cid: f"Source {i + 1}" for i, cid in enumerate(cite_order)}
 
     story.append(Paragraph("<b>Section 2 — Regulatory compliance</b>", h2))
-    story.append(_para(reg.summary[:12000], body))
+    story.append(_para(_truncate_pdf_text(_strip_markdown_for_pdf(reg.summary), 12_000), body))
 
     if reg.applicable_regulations:
         story.append(Paragraph("<b>Applicable regulations</b>", h3))
@@ -171,7 +216,7 @@ def build_report_pdf(report: ReportResponse) -> bytes:
                 )
             )
         if reg.penalty_exposure_note:
-            story.append(_para(reg.penalty_exposure_note, body))
+            story.append(_para_markdown(reg.penalty_exposure_note, body))
 
     if reg.citations:
         story.append(Paragraph("<b>Sources</b>", h3))
@@ -180,6 +225,28 @@ def build_report_pdf(report: ReportResponse) -> bytes:
             if c.cfr_citation:
                 line += f" (CFR: {c.cfr_citation})"
             story.append(_para(line, small))
+
+    if what_if is not None:
+        story.append(PageBreak())
+        story.append(Paragraph("<b>What-if scenario (simulator)</b>", h2))
+        story.append(Paragraph("<b>Scenario prompt</b>", h3))
+        story.append(
+            _para(_truncate_pdf_text(_strip_markdown_for_pdf(what_if.scenario_prompt), 8000), body),
+        )
+        story.append(Paragraph("<b>AI narrative</b>", h3))
+        story.append(
+            _para(_truncate_pdf_text(_strip_markdown_for_pdf(what_if.narrative), 48_000), body),
+        )
+        if what_if.compliance_blockers:
+            story.append(Paragraph("<b>Compliance blockers</b>", h3))
+            for b in what_if.compliance_blockers:
+                title = escape(_strip_markdown_for_pdf((b.title or "").strip() or "—"))
+                sev = escape(str(b.severity))
+                story.append(Paragraph(f"<b>{title}</b> — <i>{sev}</i>", body))
+                story.append(
+                    _para(_truncate_pdf_text(_strip_markdown_for_pdf(b.detail), 4000), small),
+                )
+                story.append(Spacer(1, 0.04 * inch))
 
     doc.build(story)
     buf.seek(0)

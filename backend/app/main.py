@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, Response
 
 from app.config import get_settings
 from app.routers import sentinel as sentinel_router
-from app.schemas.report import ReportRequest, ReportResponse
+from app.schemas.report import ReportPdfRequest, ReportRequest, ReportResponse
 from app.services.orchestrator import build_unified_report
 from app.services.regulatory_paths import resolve_regulatory_pdf_safe, resolve_under_backend
 from app.services.report_pdf import build_report_pdf
@@ -73,17 +73,18 @@ async def create_report(body: ReportRequest) -> ReportResponse:
 
 
 @app.post("/report/pdf")
-async def create_report_pdf(body: ReportRequest) -> Response:
-    """Same inputs as /report; returns application/pdf (ReportLab)."""
+async def create_report_pdf(body: ReportPdfRequest) -> Response:
+    """Product + suppliers like /report; optional what_if adds a scenario appendix page."""
+    req = ReportRequest(product_description=body.product_description, suppliers=body.suppliers)
     try:
-        report = await build_unified_report(body)
+        report = await build_unified_report(req)
     except Exception:  # noqa: BLE001
         logger.exception("PDF report generation failed")
         raise HTTPException(
             status_code=500,
             detail="We couldn't generate this PDF. Please try again in a moment.",
         ) from None
-    pdf_bytes = build_report_pdf(report)
+    pdf_bytes = build_report_pdf(report, body.what_if)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

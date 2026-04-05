@@ -44,9 +44,6 @@ export function ComplianceTab({
         <div className="space-y-8 rounded-2xl border border-slate-200 bg-surface-card p-6 shadow-sm">
           <div>
             <h2 className="text-lg font-semibold text-ink">Compliance report</h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              Sanctions screening and U.S. regulatory guidance. Same API as standalone Clearpath.
-            </p>
           </div>
 
           {complianceError && (

@@ -9,6 +9,23 @@ export type ReportRequest = {
   suppliers: SupplierInput[];
 };
 
+/** Optional appendix for POST /report/pdf (Sentinel unified export). */
+export type WhatIfComplianceBlockerPdf = {
+  title: string;
+  detail: string;
+  severity: "high" | "medium" | "low";
+};
+
+export type WhatIfPdfSection = {
+  scenario_prompt: string;
+  narrative: string;
+  compliance_blockers: WhatIfComplianceBlockerPdf[];
+};
+
+export type ReportPdfRequest = ReportRequest & {
+  what_if?: WhatIfPdfSection | null;
+};
+
 export type MatchedListEntry = {
   source_list: string;
   entity_type: string | null;

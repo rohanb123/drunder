@@ -1,4 +1,4 @@
-import type { ReportRequest, ReportResponse } from "./types";
+import type { ReportPdfRequest, ReportRequest, ReportResponse } from "./types";
 
 export function baseUrl(): string {
   const u = process.env.NEXT_PUBLIC_API_URL;
@@ -37,7 +37,7 @@ export async function postReport(body: ReportRequest): Promise<ReportResponse> {
   return res.json() as Promise<ReportResponse>;
 }
 
-export async function postReportPdf(body: ReportRequest): Promise<Blob> {
+export async function postReportPdf(body: ReportPdfRequest): Promise<Blob> {
   const res = await fetch(`${baseUrl()}/report/pdf`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
