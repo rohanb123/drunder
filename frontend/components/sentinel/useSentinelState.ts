@@ -14,6 +14,8 @@ import type { SentinelTab } from "./SentinelHeader";
 
 const emptySupplier = (): SupplierInput => ({ name: "", role: "" });
 
+type BrowserPrefill = { company: string; note: string } | null;
+
 function complianceRequestError(productDescription: string, suppliers: SupplierInput[]): string | null {
   const product = productDescription.trim();
   if (!product) return "Add a product description.";
@@ -50,6 +52,8 @@ export function useSentinelState() {
   const [compliancePdfLoading, setCompliancePdfLoading] = useState(false);
   const [complianceError, setComplianceError] = useState<string | null>(null);
 
+  const [browserPrefill, setBrowserPrefill] = useState<BrowserPrefill>(null);
+
   const setTab = useCallback(
     (t: SentinelTab) => {
       if (t === "supplychain" && !complianceReport) return;
@@ -58,6 +62,10 @@ export function useSentinelState() {
     [complianceReport],
   );
 
+  const prefillBrowserAgent = useCallback((company: string, note: string) => {
+    setBrowserPrefill({ company, note });
+    setTabInner("browser");
+  }, []);
 
   useEffect(() => {
     if (!complianceReport && tab === "supplychain") {
@@ -191,5 +199,7 @@ export function useSentinelState() {
     complianceError,
     runComplianceReport,
     downloadCompliancePdf,
+    browserPrefill,
+    prefillBrowserAgent,
   };
 }

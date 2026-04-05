@@ -1,20 +1,32 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { baseUrl } from "@/lib/api";
 
 type AgentStatus = "idle" | "running" | "done" | "error";
 
 const TOTAL_STEPS = 6;
 
-export function BrowserAgentTab() {
-  const [company, setCompany] = useState("");
-  const [note, setNote] = useState("");
+type Props = {
+  initialCompany?: string;
+  initialNote?: string;
+};
+
+export function BrowserAgentTab({ initialCompany = "", initialNote = "" }: Props) {
+  const [company, setCompany] = useState(initialCompany);
+  const [note, setNote] = useState(initialNote);
   const [status, setStatus] = useState<AgentStatus>("idle");
   const [stepIndex, setStepIndex] = useState(0);
   const [liveUrl, setLiveUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Sync pre-fill when props change (e.g. user clicks "Take action" from report)
+  useEffect(() => {
+    if (initialCompany) setCompany(initialCompany);
+    if (initialNote) setNote(initialNote);
+    if (initialCompany || initialNote) setStatus("idle");
+  }, [initialCompany, initialNote]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,8 +68,11 @@ export function BrowserAgentTab() {
 
           const event = eventMatch[1];
           let data: string;
-          try { data = JSON.parse(dataMatch[1]) as string; }
-          catch { data = dataMatch[1]; }
+          try {
+            data = JSON.parse(dataMatch[1]) as string;
+          } catch {
+            data = dataMatch[1];
+          }
 
           if (event === "status") {
             setStepIndex((i) => Math.min(i + 1, TOTAL_STEPS - 1));
@@ -160,7 +175,6 @@ export function BrowserAgentTab() {
       {/* Progress card */}
       {status !== "idle" && (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-          {/* Progress bar only */}
           <div>
             <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
               <span>
@@ -200,16 +214,25 @@ export function BrowserAgentTab() {
 
           {/* Success banner */}
           {status === "done" && (
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 text-lg">
-                ✓
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-emerald-800">Successfully updated supply dashboard</p>
-                <p className="text-xs text-emerald-600 mt-0.5">
-                  Internal note added and supplier message sent for {company}.
-                </p>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 text-lg">
+                  ✓
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-800">Successfully updated supply dashboard</p>
+                  <p className="text-xs text-emerald-600 mt-0.5">
+                    Internal note added and supplier message sent for{" "}
+                    <span className="font-medium">{company}</span>.
+                  </p>
+                </div>
               </div>
+              {note && (
+                <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Context sent</p>
+                  <p className="text-sm text-slate-700 leading-relaxed">{note}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
