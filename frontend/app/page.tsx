@@ -8,6 +8,51 @@ import type { ReportRequest, ReportResponse, SupplierInput } from "@/lib/types";
 
 const emptySupplier = (): SupplierInput => ({ name: "" });
 
+/** Normalize CSV header for matching (BOM, case, underscores, spaces). */
+function normalizeCsvHeader(raw: string): string {
+  return raw
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+/** Pick supplier name cell from one CSV row; supports common export column names. */
+function nameFromCsvRow(row: Record<string, string>): string {
+  const map = new Map<string, string>();
+  for (const [rawK, rawV] of Object.entries(row)) {
+    const key = normalizeCsvHeader(rawK);
+    const val = typeof rawV === "string" ? rawV.trim() : String(rawV ?? "").trim();
+    if (!key) continue;
+    map.set(key, val);
+  }
+  const prefer = [
+    "supplier name",
+    "name",
+    "supplier",
+    "vendor",
+    "company",
+    "legal name",
+    "vendor name",
+    "company name",
+    "business name",
+    "entity name",
+  ];
+  for (const k of prefer) {
+    const v = map.get(k);
+    if (v) return v;
+  }
+  for (const [k, v] of Array.from(map.entries())) {
+    if (!v) continue;
+    if (k.includes("supplier") && k.includes("name")) return v;
+  }
+  for (const v of Array.from(map.values())) {
+    if (v) return v;
+  }
+  return "";
+}
+
 export default function HomePage() {
   const [productDescription, setProductDescription] = useState("");
   const [suppliers, setSuppliers] = useState<SupplierInput[]>([emptySupplier()]);
@@ -28,11 +73,10 @@ export default function HomePage() {
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (h) => h.replace(/^\uFEFF/, "").trim(),
       complete: (results) => {
         const rows = results.data
-          .map((row) => ({
-            name: (row.name ?? row.supplier_name ?? row.Supplier ?? "").trim(),
-          }))
+          .map((row) => ({ name: nameFromCsvRow(row) }))
           .filter((r) => r.name);
         if (rows.length) setSuppliers(rows);
       },
@@ -64,6 +108,14 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setProductDescription("");
+    setSuppliers([emptySupplier()]);
+    setError(null);
+    setLoading(false);
+    setPdfLoading(false);
   };
 
   const downloadPdf = async () => {
@@ -104,7 +156,7 @@ export default function HomePage() {
               id="product"
               rows={4}
               className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              placeholder="e.g. Silicone teething toy for infants, sold in retail blister packs…"
+              placeholder='e.g. Cold-brew coffee concentrate in glass bottles, US nationwide, label with caffeine and "natural flavors".'
               value={productDescription}
               onChange={(e) => setProductDescription(e.target.value)}
             />
@@ -136,11 +188,6 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
-            <p className="mt-1 text-xs text-ink-muted">
-              CSV headers: <code className="rounded bg-slate-100 px-1">name</code> (aliases:{" "}
-              <code className="rounded bg-slate-100 px-1">supplier_name</code>,{" "}
-              <code className="rounded bg-slate-100 px-1">Supplier</code>).
-            </p>
             <div className="mt-3 space-y-3">
               {suppliers.map((s, i) => (
                 <div key={i} className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -184,7 +231,10 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => setReport(null)}
+              onClick={() => {
+                setReport(null);
+                resetForm();
+              }}
               className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-slate-50"
             >
               New report

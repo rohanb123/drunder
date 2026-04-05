@@ -11,7 +11,20 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import ListFlowable, ListItem, Paragraph, SimpleDocTemplate, Spacer
 
-from app.schemas.report import ReportResponse, RegulatoryBullet
+from app.schemas.report import ReportResponse, RegulatoryBullet, SupplierRiskResult
+
+_STATUS_ORDER = {"flagged": 0, "review": 1, "clear": 2}
+
+
+def _sorted_supplier_risk(rows: list[SupplierRiskResult]) -> list[SupplierRiskResult]:
+    """Flagged first, then review, then clear; tie-break by name."""
+    return sorted(
+        rows,
+        key=lambda r: (
+            _STATUS_ORDER.get(str(r.status), 99),
+            (r.supplier_name or "").lower(),
+        ),
+    )
 
 
 def _para(text: str, style) -> Paragraph:
@@ -99,7 +112,10 @@ def build_report_pdf(report: ReportResponse) -> bytes:
     story.append(_para(report.product_description[:8000], body))
 
     story.append(Paragraph("<b>Section 1 — Supplier screening</b>", h2))
-    for r in report.supplier_risk:
+    story.append(
+        Paragraph("<i>Sorted by risk: flagged, then review, then clear.</i>", small),
+    )
+    for r in _sorted_supplier_risk(report.supplier_risk):
         status = escape(str(r.status))
         name = escape(r.supplier_name or "")
         story.append(Paragraph(f"<b>{name}</b> — <i>{status}</i>", body))

@@ -1,4 +1,25 @@
-import type { RegulatoryBullet, RegulatoryCitation, ReportResponse } from "@/lib/types";
+import type {
+  RegulatoryBullet,
+  RegulatoryCitation,
+  ReportResponse,
+  SupplierRiskResult,
+} from "@/lib/types";
+
+/** Highest-risk suppliers first: flagged → review → clear. */
+const SUPPLIER_STATUS_RANK: Record<SupplierRiskResult["status"], number> = {
+  flagged: 0,
+  review: 1,
+  clear: 2,
+};
+
+function sortSuppliersByRisk(suppliers: SupplierRiskResult[]): SupplierRiskResult[] {
+  return [...suppliers].sort((a, b) => {
+    const ra = SUPPLIER_STATUS_RANK[a.status] ?? 99;
+    const rb = SUPPLIER_STATUS_RANK[b.status] ?? 99;
+    if (ra !== rb) return ra - rb;
+    return a.supplier_name.localeCompare(b.supplier_name, undefined, { sensitivity: "base" });
+  });
+}
 
 function citeAnchorId(chunkId: string): string {
   const slug = chunkId.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-|-$/g, "");
@@ -85,13 +106,17 @@ function RegulatoryBulletList({
 
 export function ReportView({ report }: { report: ReportResponse }) {
   const citeNums = citationSourceNumbers(report.regulatory.citations);
+  const suppliersOrdered = sortSuppliersByRisk(report.supplier_risk);
 
   return (
     <div className="space-y-10">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-ink">Section 1 — Supplier screening</h2>
+        <p className="mt-1 text-xs text-ink-muted">
+          Sorted by risk: flagged first, then needs review, then clear.
+        </p>
         <ul className="mt-4 divide-y divide-slate-100">
-          {report.supplier_risk.map((r, idx) => (
+          {suppliersOrdered.map((r, idx) => (
             <li key={`${r.supplier_name}-${idx}`} className="flex flex-wrap items-baseline justify-between gap-2 py-3">
               <span className="font-medium text-ink">{r.supplier_name}</span>
               <span
