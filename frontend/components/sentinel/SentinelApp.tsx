@@ -21,6 +21,7 @@ export function SentinelApp() {
             addSupplierRow={s.addComplianceSupplierRow}
             updateSupplierRow={s.updateComplianceSupplierRow}
             removeSupplierRow={s.removeComplianceSupplierRow}
+            replaceSupplierRows={s.replaceComplianceSuppliers}
             onComplianceCsv={s.onComplianceCsv}
             report={s.complianceReport}
             clearReport={s.clearComplianceReport}

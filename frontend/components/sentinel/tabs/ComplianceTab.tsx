@@ -10,9 +10,8 @@ const EXAMPLE_PRODUCT =
 
 const EXAMPLE_SUPPLIERS: SupplierInput[] = [
   { name: "Zhejiang Metal Works Co.", role: "Primary manufacturer of stainless steel bottle bodies" },
-  { name: "Nguyen Packaging Ltd", role: "Vietnamese co-manufacturer for bamboo lid assembly" },
-  { name: "Baja Co-Pack S.A.", role: "Mexican co-packer for final assembly and labeling" },
-  { name: "SinoChem Trading", role: "Chemicals supplier for surface coating and lacquers" },
+  { name: "Illuminati", role: "Delivery" },
+  { name: "DuPont", role: "Bamboo Supplier" },
 ];
 
 type Props = {
@@ -22,6 +21,7 @@ type Props = {
   addSupplierRow: () => void;
   updateSupplierRow: (index: number, patch: Partial<SupplierRow>) => void;
   removeSupplierRow: (index: number) => void;
+  replaceSupplierRows: (rows: SupplierRow[]) => void;
   onComplianceCsv: (file: File | null) => void;
   report: ReportResponse | null;
   clearReport: () => void;
@@ -39,6 +39,7 @@ export function ComplianceTab({
   addSupplierRow,
   updateSupplierRow,
   removeSupplierRow,
+  replaceSupplierRows,
   onComplianceCsv,
   report,
   clearReport,
@@ -50,13 +51,7 @@ export function ComplianceTab({
 }: Props) {
   function loadExample() {
     setProductDescription(EXAMPLE_PRODUCT);
-    // Replace all rows with example suppliers
-    // We do this by updating each existing row then adding new ones
-    EXAMPLE_SUPPLIERS.forEach((s, i) => updateSupplierRow(i, s));
-    // Add remaining rows if needed (we have 4 examples, default starts with 1)
-    for (let i = suppliers.length; i < EXAMPLE_SUPPLIERS.length; i++) {
-      addSupplierRow();
-    }
+    replaceSupplierRows(EXAMPLE_SUPPLIERS.map((s) => ({ ...s })));
   }
 
   return (

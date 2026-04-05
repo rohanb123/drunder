@@ -18,7 +18,7 @@ export function SentinelHeader({ tab, onTab, reportTabsUnlocked }: Props) {
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-zinc-900">
-            Clearpath
+            ClearPath
             <span className="ml-2 text-violet-600">·</span>
             <span className="ml-2 text-zinc-500 font-medium">Supply Chain Intelligence</span>
           </h1>

@@ -1,1 +1,1 @@
-"""Clearpath API — unified compliance report backend."""
+"""ClearPath API — unified compliance report backend."""

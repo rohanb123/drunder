@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clearpath — Compliance & supply chain sentinel",
+  title: "ClearPath — Compliance & supply chain sentinel",
   description:
     "Sanctions screening, regulatory guidance, and supply chain mapping.",
 };

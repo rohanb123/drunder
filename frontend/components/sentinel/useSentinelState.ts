@@ -85,6 +85,10 @@ export function useSentinelState() {
     setComplianceSuppliers((rows) => (rows.length <= 1 ? rows : rows.filter((_, j) => j !== index)));
   }, []);
 
+  const replaceComplianceSuppliers = useCallback((rows: SupplierInput[]) => {
+    setComplianceSuppliers(rows.length ? rows.map((r) => ({ ...r })) : [emptySupplier()]);
+  }, []);
+
   const onComplianceCsv = useCallback((file: File | null) => {
     if (!file) return;
     setComplianceError(null);
@@ -160,7 +164,7 @@ export function useSentinelState() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "clearpath-report.pdf";
+      a.download = "ClearPath-report.pdf";
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -190,6 +194,7 @@ export function useSentinelState() {
     addComplianceSupplierRow,
     updateComplianceSupplierRow,
     removeComplianceSupplierRow,
+    replaceComplianceSuppliers,
     onComplianceCsv,
     complianceReport,
     mergeSupplyChain,

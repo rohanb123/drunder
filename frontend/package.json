@@ -1,5 +1,6 @@
 {
   "name": "clearpath-web",
+  "description": "ClearPath — Next.js frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {

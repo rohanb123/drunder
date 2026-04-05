@@ -156,7 +156,7 @@ def build_report_pdf(report: ReportResponse, what_if: WhatIfPdfSection | None = 
     )
 
     story: list = []
-    story.append(Paragraph(escape("Clearpath — Compliance Report"), title))
+    story.append(Paragraph(escape("ClearPath — Compliance Report"), title))
     story.append(Spacer(1, 0.1 * inch))
 
     story.append(Paragraph("<b>Product description</b>", h2))

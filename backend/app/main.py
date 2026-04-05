@@ -22,7 +22,7 @@ from app.services.report_pdf import build_report_pdf
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Clearpath API",
+    title="ClearPath API",
     description="Supplier sanctions screening and US regulatory compliance report.",
     version="0.1.0",
 )
@@ -106,5 +106,5 @@ async def create_report_pdf(body: ReportPdfRequest) -> Response:
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="clearpath-report.pdf"'},
+        headers={"Content-Disposition": 'attachment; filename="ClearPath-report.pdf"'},
     )
