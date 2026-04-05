@@ -31,6 +31,10 @@ export type RegulatoryCitation = {
   cfr_citation: string | null;
   document_id: string | null;
   chunk_id: string | null;
+  /** Relative path under server regulatory_pdfs; open via /regulatory/pdfs?path= */
+  source_file?: string | null;
+  /** 1-based page in the source PDF (chunk start); use as URL fragment #page=N */
+  source_page?: number | null;
 };
 
 export type RegulatoryBullet = {

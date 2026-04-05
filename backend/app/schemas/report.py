@@ -38,6 +38,10 @@ class RegulatoryCitation(BaseModel):
     cfr_citation: str | None = Field(None, description="CFR reference from chunk metadata when available")
     document_id: str | None = None
     chunk_id: str | None = None
+    # Relative path under regulatory_pdfs (e.g. fda/guide.pdf); used with GET /regulatory/pdfs?path=…
+    source_file: str | None = Field(None, description="Path relative to regulatory PDF root for opening the source PDF")
+    # 1-based page from ingest (chunk start page); clients may append #page=N to the PDF URL
+    source_page: int | None = Field(None, description="1-based starting PDF page for this chunk")
 
 
 class RegulatoryBullet(BaseModel):

@@ -1,12 +1,13 @@
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 
 from app.config import get_settings
 from app.schemas.report import ReportRequest, ReportResponse
 from app.services.orchestrator import build_unified_report
+from app.services.regulatory_paths import resolve_regulatory_pdf_safe, resolve_under_backend
 from app.services.report_pdf import build_report_pdf
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,29 @@ app.add_middleware(
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/regulatory/pdfs")
+async def get_regulatory_source_pdf(
+    path: str = Query(
+        ...,
+        min_length=1,
+        max_length=512,
+        description="Relative path under the regulatory PDF folder, e.g. fda/my-guide.pdf",
+    ),
+) -> FileResponse:
+    """Serve an ingested guidance PDF for source links (fragment #page=N is applied by the browser)."""
+    settings = get_settings()
+    root = resolve_under_backend(settings.regulatory_pdfs_path)
+    file_path = resolve_regulatory_pdf_safe(root, path)
+    if file_path is None:
+        raise HTTPException(status_code=404, detail="PDF not found")
+    return FileResponse(
+        str(file_path),
+        media_type="application/pdf",
+        filename=file_path.name,
+        headers={"Content-Disposition": f'inline; filename="{file_path.name}"'},
+    )
 
 
 @app.post("/report", response_model=ReportResponse)

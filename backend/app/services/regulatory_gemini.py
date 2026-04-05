@@ -90,6 +90,22 @@ def _truncate_concise_bullet(s: str, max_len: int = 160) -> str:
     return f"{cut}…" if cut else s[:max_len]
 
 
+def _source_file_from_meta(md: dict[str, str]) -> str | None:
+    sf = (md.get("source_file") or "").strip()
+    return sf or None
+
+
+def _source_page_from_meta(md: dict[str, str]) -> int | None:
+    s = (md.get("page_start") or "").strip()
+    if not s:
+        return None
+    try:
+        p = int(s)
+        return p if p >= 1 else None
+    except ValueError:
+        return None
+
+
 def _reader_facing_citation_title(c: RetrievedChunk) -> str:
     """Human-readable source line: agency, document name, page(s)—no internal chunk jargon."""
     md = c.metadata
@@ -134,6 +150,8 @@ def _apply_reader_citation_labels(
                 cfr_citation=cfr_model or cfr_meta,
                 document_id=md.get("document_id") or cit.document_id,
                 chunk_id=cit.chunk_id,
+                source_file=_source_file_from_meta(md),
+                source_page=_source_page_from_meta(md),
             )
         )
     return out
@@ -152,6 +170,8 @@ def citations_from_chunks(chunks: list[RetrievedChunk]) -> list[RegulatoryCitati
                 cfr_citation=cfr,
                 document_id=md.get("document_id") or None,
                 chunk_id=c.id,
+                source_file=_source_file_from_meta(md),
+                source_page=_source_page_from_meta(md),
             )
         )
     return out
@@ -190,10 +210,12 @@ Product:
 Excerpts (1–{n}; internal chunk_id is for your JSON only—readers will not see it):
 {body}
 
+Before you write JSON, infer **product compliance hooks** from the product line above—concrete, neutral facts only (e.g. who it is for, materials or ingredients you can name, packaging/form, marketing or label claims mentioned, food vs non-food, electrical/battery, children's product signals, import vs domestic if stated). Use these hooks to **navigate** which excerpts matter and to **phrase** bullets so they clearly apply to *this* product. Do **not** invent obligations from the product text alone; every regulatory claim must still be supported by excerpt wording.
+
 Rules:
-1. **summary**: At most **3 short sentences**, plain English. Name the product type. Say what the excerpts actually cover (which agencies/topics). Do not over-claim FDA food rules unless excerpts are about food/contact.
-2. **applicable_regulations**: Array of objects. Each object: **text** = one concrete point, **very concise** (aim ≤ 120 characters; no filler). **citation_chunk_ids** = array of exact **chunk_id** strings from the excerpts that support that point (at least one id per bullet when possible). Use [] if unsupported.
-3. **testing_requirements**: Same object shape; only if excerpts explicitly mention testing/studies/data. Else [].
+1. **summary**: At most **3 short sentences**, plain English. Name the product type and tie it to **one or two** of those hooks (e.g. audience, materials, or claims) **only** where excerpts actually discuss that angle. Say which agencies/topics the excerpts cover. Do not over-claim FDA food rules unless excerpts are about food/contact.
+2. **applicable_regulations**: Array of objects. Each object: **text** = one concrete point, **very concise** (aim ≤ 120 characters; no filler). Where the excerpt allows, start from a product hook (e.g. "For your glass-and-closure format…" / "Given label claims about…") then the requirement—still **fully** supported by cited text. **citation_chunk_ids** = array of exact **chunk_id** strings from the excerpts that support that point (at least one id per bullet when possible). Use [] if unsupported.
+3. **testing_requirements**: Same object shape; only if excerpts explicitly mention testing/studies/data. Else []. Tie to a relevant product hook when the excerpt makes that link clear.
 4. **penalty_exposure_note**: At most **one short sentence**, or null.
 5. No meta-instructions in the output. No word "chunk" in user-facing strings.
 6. **citations**: Include one object per excerpt you relied on (up to {n}). Use exact **chunk_id** from the excerpt header. **title** will be replaced server-side for readers—set **title** to the excerpt **document_id** for your own reference only. **source** = source_agency. **cfr_citation** = null or copied from excerpt metadata.

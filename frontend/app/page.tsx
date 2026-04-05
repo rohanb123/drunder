@@ -18,6 +18,39 @@ function normalizeCsvHeader(raw: string): string {
     .replace(/\s+/g, " ");
 }
 
+/** Normalized tokens that indicate a header row (not a supplier name). */
+const CSV_HEADER_TOKENS = new Set([
+  "name",
+  "supplier",
+  "supplier name",
+  "vendor",
+  "company",
+  "legal name",
+  "vendor name",
+  "company name",
+  "business name",
+  "entity name",
+  "country",
+  "country of origin",
+  "notes",
+  "email",
+  "phone",
+  "website",
+]);
+
+function csvCellLooksLikeHeader(cell: string): boolean {
+  const t = normalizeCsvHeader(cell);
+  if (!t) return true;
+  return CSV_HEADER_TOKENS.has(t);
+}
+
+/** True if the first row is clearly column titles, not the first supplier line. */
+function csvFirstRowIsHeader(row: string[]): boolean {
+  const cells = row.map((c) => c.replace(/^\uFEFF/, "").trim()).filter((c) => c.length > 0);
+  if (cells.length === 0) return false;
+  return cells.every((c) => csvCellLooksLikeHeader(c));
+}
+
 /** Pick supplier name cell from one CSV row; supports common export column names. */
 function nameFromCsvRow(row: Record<string, string>): string {
   const map = new Map<string, string>();
@@ -70,15 +103,46 @@ export default function HomePage() {
   };
 
   const onCsvUpload = useCallback((file: File) => {
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (h) => h.replace(/^\uFEFF/, "").trim(),
+    Papa.parse<string[]>(file, {
+      header: false,
+      skipEmptyLines: "greedy",
       complete: (results) => {
-        const rows = results.data
-          .map((row) => ({ name: nameFromCsvRow(row) }))
-          .filter((r) => r.name);
-        if (rows.length) setSuppliers(rows);
+        const raw = results.data as string[][];
+        if (!raw.length) return;
+
+        const dataRows: SupplierInput[] = [];
+        let start = 0;
+        let headerKeys: string[] | null = null;
+
+        if (csvFirstRowIsHeader(raw[0])) {
+          headerKeys = raw[0].map((h, j) => {
+            const t = h.replace(/^\uFEFF/, "").trim();
+            return t || `column_${j}`;
+          });
+          start = 1;
+        }
+
+        for (let i = start; i < raw.length; i++) {
+          const line = raw[i];
+          if (!line || !line.some((c) => String(c ?? "").trim())) continue;
+
+          if (headerKeys) {
+            const row: Record<string, string> = {};
+            headerKeys.forEach((key, j) => {
+              row[key] = String(line[j] ?? "").trim();
+            });
+            const name = nameFromCsvRow(row);
+            if (name) dataRows.push({ name });
+          } else {
+            const name =
+              line
+                .map((c) => String(c ?? "").replace(/^\uFEFF/, "").trim())
+                .find((c) => c.length > 0) ?? "";
+            if (name) dataRows.push({ name });
+          }
+        }
+
+        if (dataRows.length) setSuppliers(dataRows);
       },
     });
   }, []);

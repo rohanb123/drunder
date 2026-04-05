@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { regulatorySourcePdfUrl } from "@/lib/api";
 import type {
   RegulatoryBullet,
   RegulatoryCitation,
@@ -42,6 +44,12 @@ function citationSourceNumbers(citations: RegulatoryCitation[]): Map<string, num
   return m;
 }
 
+function sourceLinkForChunk(citations: RegulatoryCitation[], chunkId: string): string | null {
+  const c = citations.find((x) => x.chunk_id === chunkId);
+  if (!c) return null;
+  return regulatorySourcePdfUrl(c.source_file, c.source_page);
+}
+
 function MatchBlock({ match }: { match: NonNullable<ReportResponse["supplier_risk"][0]["match"]> }) {
   return (
     <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2 text-sm text-ink-muted">
@@ -68,15 +76,17 @@ function MatchBlock({ match }: { match: NonNullable<ReportResponse["supplier_ris
 function RegulatoryBulletList({
   items,
   citeNums,
+  citations,
 }: {
   items: (RegulatoryBullet | string)[];
   citeNums: Map<string, number>;
+  citations: RegulatoryCitation[];
 }) {
   return (
     <ul className="mt-2 list-inside list-disc space-y-2 text-sm leading-snug text-ink-muted">
       {items.map((raw, idx) => {
         const b = normalizeBullet(raw);
-        const ids = [...new Set(b.citation_chunk_ids)];
+        const ids = Array.from(new Set(b.citation_chunk_ids));
         return (
           <li key={`b-${idx}`} className="marker:text-slate-400">
             <span className="text-ink-muted">{b.text}</span>
@@ -85,10 +95,15 @@ function RegulatoryBulletList({
                 {ids.map((cid) => {
                   const n = citeNums.get(cid);
                   if (n == null) return null;
+                  const pdfHref = sourceLinkForChunk(citations, cid);
+                  const inPage = `#${citeAnchorId(cid)}`;
+                  const href = pdfHref ?? inPage;
+                  const external = Boolean(pdfHref);
                   return (
                     <a
                       key={cid}
-                      href={`#${citeAnchorId(cid)}`}
+                      href={href}
+                      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                       className="ml-2 font-medium text-accent underline-offset-2 hover:underline"
                     >
                       Source {n}
@@ -107,6 +122,27 @@ function RegulatoryBulletList({
 export function ReportView({ report }: { report: ReportResponse }) {
   const citeNums = citationSourceNumbers(report.regulatory.citations);
   const suppliersOrdered = sortSuppliersByRisk(report.supplier_risk);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+
+  useEffect(() => {
+    const expandIfHashTargetsSource = () => {
+      const raw = window.location.hash.slice(1);
+      if (!raw || !raw.startsWith("reg-cite-")) return;
+      const el = document.getElementById(raw);
+      if (!el) return;
+      const panel = el.closest("[data-sources-panel]");
+      if (panel instanceof HTMLDetailsElement && !panel.open) {
+        setSourcesOpen(true);
+      }
+    };
+    expandIfHashTargetsSource();
+    window.addEventListener("hashchange", expandIfHashTargetsSource);
+    return () => window.removeEventListener("hashchange", expandIfHashTargetsSource);
+  }, [report.regulatory.citations]);
+
+  useEffect(() => {
+    setSourcesOpen(false);
+  }, [report.product_description, report.regulatory.citations.length]);
 
   return (
     <div className="space-y-10">
@@ -130,9 +166,6 @@ export function ReportView({ report }: { report: ReportResponse }) {
               >
                 {r.status}
               </span>
-              {r.fuzzy_score != null && (
-                <p className="w-full text-xs text-ink-muted">Fuzzy score: {r.fuzzy_score}</p>
-              )}
               {r.notes && <p className="w-full text-sm text-ink-muted">{r.notes}</p>}
               {r.match && <MatchBlock match={r.match} />}
             </li>
@@ -146,13 +179,21 @@ export function ReportView({ report }: { report: ReportResponse }) {
         {report.regulatory.applicable_regulations.length > 0 && (
           <div className="mt-4">
             <h3 className="text-sm font-semibold text-ink">Applicable regulations</h3>
-            <RegulatoryBulletList items={report.regulatory.applicable_regulations} citeNums={citeNums} />
+            <RegulatoryBulletList
+              items={report.regulatory.applicable_regulations}
+              citeNums={citeNums}
+              citations={report.regulatory.citations}
+            />
           </div>
         )}
         {report.regulatory.testing_requirements.length > 0 && (
           <div className="mt-4">
             <h3 className="text-sm font-semibold text-ink">Testing requirements</h3>
-            <RegulatoryBulletList items={report.regulatory.testing_requirements} citeNums={citeNums} />
+            <RegulatoryBulletList
+              items={report.regulatory.testing_requirements}
+              citeNums={citeNums}
+              citations={report.regulatory.citations}
+            />
           </div>
         )}
         {(report.regulatory.estimated_compliance_cost_usd != null ||
@@ -173,31 +214,72 @@ export function ReportView({ report }: { report: ReportResponse }) {
           </div>
         )}
         {report.regulatory.citations.length > 0 && (
-          <div className="mt-4">
-            <h3 className="text-sm font-semibold text-ink">Sources</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Agency, document title, and page—so you can open the same guidance yourself.
-            </p>
-            <ul className="mt-2 space-y-2">
-              {report.regulatory.citations.map((c, i) => (
-                <li
-                  key={`${c.document_id ?? "src"}-${i}`}
-                  id={c.chunk_id ? citeAnchorId(c.chunk_id) : undefined}
-                  className="scroll-mt-24 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 text-sm text-ink-muted"
-                >
-                  <p className="font-medium text-ink">
-                    {c.chunk_id && citeNums.has(c.chunk_id) ? (
-                      <span className="mr-2 text-xs font-normal text-slate-500">Source {citeNums.get(c.chunk_id)}.</span>
-                    ) : null}
-                    {c.title}
-                  </p>
-                  {c.cfr_citation && (
-                    <p className="mt-1 text-xs text-slate-600">CFR: {c.cfr_citation}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <details
+            data-sources-panel
+            className="group/sources mt-4 rounded-xl border border-slate-200 bg-white shadow-sm open:shadow-md"
+            open={sourcesOpen}
+            onToggle={(e) => setSourcesOpen(e.currentTarget.open)}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-ink marker:hidden [&::-webkit-details-marker]:hidden">
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                Sources
+                <span className="font-normal text-xs text-slate-500">
+                  ({report.regulatory.citations.length}) — tap to expand or collapse
+                </span>
+              </span>
+              <svg
+                className={`h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 ${sourcesOpen ? "rotate-180" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="border-t border-slate-100 px-4 pb-4 pt-1">
+              <p className="text-xs text-slate-500">
+                Agency, document title, and page. Use the link to open the original PDF (starts at the cited page when
+                available).
+              </p>
+              <ul className="mt-3 space-y-2">
+                {report.regulatory.citations.map((c, i) => {
+                  const pdfHref = regulatorySourcePdfUrl(c.source_file, c.source_page);
+                  return (
+                    <li
+                      key={`${c.document_id ?? "src"}-${i}`}
+                      id={c.chunk_id ? citeAnchorId(c.chunk_id) : undefined}
+                      className="scroll-mt-24 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 text-sm text-ink-muted"
+                    >
+                      <p className="font-medium text-ink">
+                        {c.chunk_id && citeNums.has(c.chunk_id) ? (
+                          <span className="mr-2 text-xs font-normal text-slate-500">
+                            Source {citeNums.get(c.chunk_id)}.
+                          </span>
+                        ) : null}
+                        {pdfHref ? (
+                          <a
+                            href={pdfHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-accent underline-offset-2 hover:underline"
+                          >
+                            {c.title}
+                          </a>
+                        ) : (
+                          c.title
+                        )}
+                      </p>
+                      {c.cfr_citation && (
+                        <p className="mt-1 text-xs text-slate-600">CFR: {c.cfr_citation}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </details>
         )}
       </section>
     </div>

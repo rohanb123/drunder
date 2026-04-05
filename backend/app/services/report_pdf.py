@@ -121,8 +121,6 @@ def build_report_pdf(report: ReportResponse) -> bytes:
         story.append(Paragraph(f"<b>{name}</b> — <i>{status}</i>", body))
         if r.notes:
             story.append(_para(r.notes, small))
-        if r.fuzzy_score is not None:
-            story.append(_para(f"Fuzzy score: {r.fuzzy_score}", small))
         m = r.match
         if m:
             story.append(
