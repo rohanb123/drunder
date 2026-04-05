@@ -2,6 +2,7 @@
 
 import { ComplianceTab } from "./tabs/ComplianceTab";
 import { SupplyChainTab } from "./tabs/SupplyChainTab";
+import { BrowserAgentTab } from "./tabs/BrowserAgentTab";
 import { SentinelHeader } from "./SentinelHeader";
 import { useSentinelState } from "./useSentinelState";
 
@@ -38,6 +39,7 @@ export function SentinelApp() {
             onSupplyChainUpdated={s.mergeSupplyChain}
           />
         )}
+        {s.tab === "browser" && <BrowserAgentTab />}
       </main>
     </div>
   );
