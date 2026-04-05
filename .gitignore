@@ -28,6 +28,7 @@ out/
 # Chroma / local data
 backend/data/chroma/
 backend/chroma_db/
+backend/sentinel_chroma/
 backend/data/regulatory_pdfs/**/*.pdf
 
 # OS

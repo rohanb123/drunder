@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clearpath — Compliance exposure in one report",
+  title: "Clearpath — Compliance & supply chain sentinel",
   description:
-    "Supplier sanctions, tariff exposure, and US regulatory requirements for physical products.",
+    "Sanctions screening, regulatory guidance, Chroma-backed supply profiles, and what-if simulation.",
 };
 
 export default function RootLayout({

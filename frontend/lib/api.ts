@@ -1,6 +1,6 @@
 import type { ReportRequest, ReportResponse } from "./types";
 
-function baseUrl(): string {
+export function baseUrl(): string {
   const u = process.env.NEXT_PUBLIC_API_URL;
   if (!u) {
     throw new Error("This app isn't configured to reach the report service. Contact your administrator.");

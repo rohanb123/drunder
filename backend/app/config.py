@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # Override with gemini-2.5-flash in .env for stronger reasoning at higher $/token.
     gemini_sanctions_model: str = "gemini-2.5-flash-lite"
     gemini_regulatory_model: str = "gemini-2.5-flash-lite"
+    # Sentinel what-if simulation (markdown + JSON); stronger model recommended.
+    gemini_simulation_model: str = "gemini-2.5-flash"
+    # Chroma persistence for supply-chain profiles (separate from regulatory RAG collection).
+    sentinel_chroma_path: str = "sentinel_chroma"
     # Regulatory RAG (paths relative to backend/ unless absolute)
     regulatory_chroma_path: str = "chroma_db"
     regulatory_pdfs_path: str = "data/regulatory_pdfs"

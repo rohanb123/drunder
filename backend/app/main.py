@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 
 from app.config import get_settings
+from app.routers import sentinel as sentinel_router
 from app.schemas.report import ReportRequest, ReportResponse
 from app.services.orchestrator import build_unified_report
 from app.services.regulatory_paths import resolve_regulatory_pdf_safe, resolve_under_backend
@@ -26,6 +27,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(sentinel_router.router)
 
 
 @app.get("/health")
