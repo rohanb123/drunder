@@ -10,7 +10,7 @@ class SupplierInput(BaseModel):
     role: str = Field(
         ...,
         min_length=1,
-        description="Required: what this supplier does (e.g. raw material supplier, co-packer)",
+        description="Required: short description of what the company does / its role (e.g. raw material supplier, co-packer)",
     )
 
     @field_validator("name", "role", mode="before")
@@ -66,7 +66,7 @@ class SupplierRiskResult(BaseModel):
     notes: str | None = None
     role: str = Field(
         default="",
-        description="Echo of client-supplied role (what the supplier does); not used for screening logic",
+        description="Echo of client-supplied description/role (what the supplier does); not used for screening logic",
     )
 
 

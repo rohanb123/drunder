@@ -12,10 +12,18 @@ def _attach_supplier_roles(
     results: list[SupplierRiskResult],
     suppliers: list[SupplierInput],
 ) -> list[SupplierRiskResult]:
-    """Echo each supplier's role onto screening results for client display (additive)."""
+    """Echo each supplier's description/role onto screening results (match by name, then index)."""
+    by_name: dict[str, str] = {}
+    for s in suppliers:
+        key = (s.name or "").strip().casefold()
+        if key:
+            by_name[key] = (s.role or "").strip()
     out: list[SupplierRiskResult] = []
     for i, r in enumerate(results):
-        role = suppliers[i].role if i < len(suppliers) else ""
+        rk = (r.supplier_name or "").strip().casefold()
+        role = by_name.get(rk, "")
+        if not role and i < len(suppliers):
+            role = (suppliers[i].role or "").strip()
         out.append(r.model_copy(update={"role": role}))
     return out
 

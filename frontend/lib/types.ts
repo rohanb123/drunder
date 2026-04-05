@@ -2,7 +2,7 @@
 
 export type SupplierInput = {
   name: string;
-  /** Required: what the supplier does (e.g. raw material, packaging); sent to /report for supply-chain mapping. */
+  /** Required: short description / role (what the supplier does); sent to /report for supply-chain mapping. */
   role: string;
 };
 

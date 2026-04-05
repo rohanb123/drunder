@@ -7,6 +7,7 @@ import type {
   SupplierInput,
   SupplyChainAnalysis,
 } from "@/lib/types";
+import { parseSupplierRowsFromMatrix } from "@/lib/complianceCsv";
 import Papa from "papaparse";
 import { useCallback, useEffect, useState } from "react";
 import type { SentinelTab } from "./SentinelHeader";
@@ -22,7 +23,7 @@ function complianceRequestError(productDescription: string, suppliers: SupplierI
   if (!rows.length) return "Add at least one supplier name.";
   const missingRole = rows.find((s) => !s.role);
   if (missingRole) {
-    return "Every supplier needs a role (what they do—for example raw materials or packaging).";
+    return "Every supplier needs a short description or role (what they do—for example raw materials or packaging).";
   }
   return null;
 }
@@ -78,21 +79,29 @@ export function useSentinelState() {
   const onComplianceCsv = useCallback((file: File | null) => {
     if (!file) return;
     setComplianceError(null);
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
+    Papa.parse<string[]>(file, {
+      header: false,
+      dynamicTyping: false,
+      skipEmptyLines: "greedy",
       complete: (results) => {
-        const rows = results.data
-          .map((row) => ({
-            name: (row.name ?? row.supplier_name ?? row.Supplier ?? "").trim(),
-            role: (row.role ?? row.supplier_role ?? row.Role ?? "").trim(),
-          }))
-          .filter((r) => r.name);
-        if (!rows.length) return;
-        const missingRole = rows.find((r) => !r.role);
+        if (results.errors.length) {
+          setComplianceError(results.errors.map((e) => e.message).join(" "));
+          return;
+        }
+        const matrix = results.data.filter(
+          (row): row is string[] => Array.isArray(row) && row.some((c) => String(c ?? "").trim() !== ""),
+        );
+        const rows = parseSupplierRowsFromMatrix(matrix);
+        if (!rows.length) {
+          setComplianceError(
+            "No suppliers found. Use two columns (name, then short description) or a header row with name + description/role columns.",
+          );
+          return;
+        }
+        const missingRole = rows.find((r) => !r.role.trim());
         if (missingRole) {
           setComplianceError(
-            "CSV must include a role for every supplier. Use a column named role, supplier_role, or Role.",
+            "Every row needs a short description in the second column (what the company does). For headered CSVs, use a column named description, role, or similar.",
           );
           return;
         }

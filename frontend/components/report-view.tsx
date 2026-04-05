@@ -157,7 +157,9 @@ export function ReportView({ report }: { report: ReportResponse }) {
               <div className="min-w-0 flex-1">
                 <span className="font-medium text-ink">{r.supplier_name}</span>
                 {(r.role ?? "").trim() ? (
-                  <p className="mt-0.5 text-xs text-ink-muted">Role: {(r.role ?? "").trim()}</p>
+                  <p className="mt-0.5 text-xs text-ink-muted">
+                    Description / role: {(r.role ?? "").trim()}
+                  </p>
                 ) : null}
               </div>
               <span

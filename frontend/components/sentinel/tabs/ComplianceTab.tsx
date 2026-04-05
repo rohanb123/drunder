@@ -69,7 +69,8 @@ export function ComplianceTab({
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-medium text-ink">
-                Suppliers to screen <span className="font-normal text-ink-muted">(name and role required)</span>
+                Suppliers to screen{" "}
+                <span className="font-normal text-ink-muted">(name and short description / role required)</span>
               </span>
               <div className="flex flex-wrap gap-2">
                 <label className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-slate-50">
@@ -93,13 +94,6 @@ export function ComplianceTab({
                 </button>
               </div>
             </div>
-            <p className="mt-1 text-xs text-ink-muted">
-              CSV: <code className="rounded bg-slate-100 px-1">name</code> or{" "}
-              <code className="rounded bg-slate-100 px-1">supplier_name</code>, and{" "}
-              <code className="rounded bg-slate-100 px-1">role</code> (or{" "}
-              <code className="rounded bg-slate-100 px-1">supplier_role</code>) — required on every row for supply-chain
-              mapping.
-            </p>
             <div className="mt-3 space-y-4">
               {suppliers.map((s, i) => (
                 <div
@@ -137,13 +131,13 @@ export function ComplianceTab({
                       htmlFor={`supplier-role-${i}`}
                       className="mb-1 block text-xs font-medium text-ink-muted"
                     >
-                      Role <span className="text-red-600">*</span>
+                      Short description / role <span className="text-red-600">*</span>
                     </label>
                     <input
                       id={`supplier-role-${i}`}
                       required
                       className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm shadow-sm focus:border-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-accent"
-                      placeholder="Required — e.g. raw silicone manufacturer, co-packer, freight forwarder"
+                      placeholder="Required — what they do (e.g. raw silicone manufacturer, co-packer, freight forwarder)"
                       value={s.role}
                       onChange={(e) => updateSupplierRow(i, { role: e.target.value })}
                       aria-required

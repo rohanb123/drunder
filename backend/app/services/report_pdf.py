@@ -171,7 +171,9 @@ def build_report_pdf(report: ReportResponse, what_if: WhatIfPdfSection | None = 
         name = escape(r.supplier_name or "")
         story.append(Paragraph(f"<b>{name}</b> — <i>{status}</i>", body))
         if (r.role or "").strip():
-            story.append(_para(f"Role: {escape((r.role or '').strip())}", small))
+            story.append(
+                _para(f"Description / role: {escape((r.role or '').strip())}", small),
+            )
         if r.notes:
             story.append(_para_markdown(r.notes, small))
         m = r.match
