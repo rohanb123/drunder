@@ -1,6 +1,4 @@
-import type { SimulationResult } from "@/lib/simulation-types";
-
-type Item = SimulationResult["complianceBlockers"][number];
+type Item = { title: string; detail: string };
 
 type Props = {
   items: Item[];

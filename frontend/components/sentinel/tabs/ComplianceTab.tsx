@@ -1,9 +1,9 @@
 "use client";
 
 import { ReportView } from "@/components/report-view";
-import type { ReportResponse } from "@/lib/types";
+import type { ReportResponse, SupplierInput } from "@/lib/types";
 
-type SupplierRow = { name: string };
+type SupplierRow = SupplierInput;
 
 type Props = {
   productDescription: string;
@@ -68,7 +68,9 @@ export function ComplianceTab({
 
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm font-medium text-ink">Suppliers to screen</span>
+              <span className="text-sm font-medium text-ink">
+                Suppliers to screen <span className="font-normal text-ink-muted">(name and role required)</span>
+              </span>
               <div className="flex flex-wrap gap-2">
                 <label className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-slate-50">
                   Upload CSV
@@ -93,24 +95,60 @@ export function ComplianceTab({
             </div>
             <p className="mt-1 text-xs text-ink-muted">
               CSV: <code className="rounded bg-slate-100 px-1">name</code> or{" "}
-              <code className="rounded bg-slate-100 px-1">supplier_name</code>.
+              <code className="rounded bg-slate-100 px-1">supplier_name</code>, and{" "}
+              <code className="rounded bg-slate-100 px-1">role</code> (or{" "}
+              <code className="rounded bg-slate-100 px-1">supplier_role</code>) — required on every row for supply-chain
+              mapping.
             </p>
-            <div className="mt-3 space-y-3">
+            <div className="mt-3 space-y-4">
               {suppliers.map((s, i) => (
-                <div key={i} className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <input
-                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    placeholder="Supplier name"
-                    value={s.name}
-                    onChange={(e) => updateSupplierRow(i, { name: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSupplierRow(i)}
-                    className="text-sm text-slate-500 hover:text-red-600 sm:w-16"
-                  >
-                    Remove
-                  </button>
+                <div
+                  key={i}
+                  className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm ring-1 ring-slate-100"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+                    <div className="min-w-0 flex-1">
+                      <label
+                        htmlFor={`supplier-name-${i}`}
+                        className="mb-1 block text-xs font-medium text-ink-muted"
+                      >
+                        Supplier name <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        id={`supplier-name-${i}`}
+                        required
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                        placeholder="Legal or trade name"
+                        value={s.name}
+                        onChange={(e) => updateSupplierRow(i, { name: e.target.value })}
+                        aria-required
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeSupplierRow(i)}
+                      className="shrink-0 pb-2 text-sm text-slate-500 hover:text-red-600 sm:w-16 sm:text-right"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="mt-2 border-l-2 border-slate-200 pl-4 sm:pl-5">
+                    <label
+                      htmlFor={`supplier-role-${i}`}
+                      className="mb-1 block text-xs font-medium text-ink-muted"
+                    >
+                      Role <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      id={`supplier-role-${i}`}
+                      required
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm shadow-sm focus:border-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-accent"
+                      placeholder="Required — e.g. raw silicone manufacturer, co-packer, freight forwarder"
+                      value={s.role}
+                      onChange={(e) => updateSupplierRow(i, { role: e.target.value })}
+                      aria-required
+                    />
+                  </div>
                 </div>
               ))}
             </div>

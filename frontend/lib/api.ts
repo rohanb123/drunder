@@ -1,4 +1,10 @@
-import type { ReportPdfRequest, ReportRequest, ReportResponse } from "./types";
+import type {
+  ReportPdfRequest,
+  ReportRequest,
+  ReportResponse,
+  SupplyChainAnalysis,
+  SupplyChainStageUpdateRequest,
+} from "./types";
 
 export function baseUrl(): string {
   const u = process.env.NEXT_PUBLIC_API_URL;
@@ -22,6 +28,27 @@ export function regulatorySourcePdfUrl(
     href += `#page=${Math.floor(sourcePage)}`;
   }
   return href;
+}
+
+export async function postSupplyChainStageUpdate(body: SupplyChainStageUpdateRequest): Promise<SupplyChainAnalysis> {
+  const res = await fetch(`${baseUrl()}/report/supply-chain/update-stage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = res.statusText || "Request failed";
+    try {
+      const j = (await res.json()) as { detail?: string | string[] };
+      const d = j.detail;
+      if (typeof d === "string") detail = d;
+      else if (Array.isArray(d)) detail = d.map(String).join(", ");
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return res.json() as Promise<SupplyChainAnalysis>;
 }
 
 export async function postReport(body: ReportRequest): Promise<ReportResponse> {

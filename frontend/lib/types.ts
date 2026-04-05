@@ -2,6 +2,8 @@
 
 export type SupplierInput = {
   name: string;
+  /** Required: what the supplier does (e.g. raw material, packaging); sent to /report for supply-chain mapping. */
+  role: string;
 };
 
 export type ReportRequest = {
@@ -40,6 +42,8 @@ export type SupplierRiskResult = {
   match: MatchedListEntry | null;
   fuzzy_score: number | null;
   notes: string | null;
+  /** Echoed from your request (what the supplier does). */
+  role?: string;
 };
 
 export type RegulatoryCitation = {
@@ -68,9 +72,42 @@ export type RegulatorySection = {
   citations: RegulatoryCitation[];
 };
 
-/** Full report: supplier screening + regulatory section. */
+export type SupplyChainMappedSupplier = {
+  name: string;
+  role: string;
+  sanctions_status: "clear" | "review" | "flagged";
+};
+
+export type SupplyChainStage = {
+  stage_name: string;
+  suppliers: SupplyChainMappedSupplier[];
+  status: "ok" | "broken" | "missing";
+  note: string;
+};
+
+export type SupplyChainAnalysis = {
+  stages: SupplyChainStage[];
+};
+
+/** POST /report/supply-chain/update-stage */
+export type SupplyChainSupplierDraft = {
+  name: string;
+  role: string;
+};
+
+export type SupplyChainStageUpdateRequest = {
+  product_description: string;
+  stages: SupplyChainStage[];
+  stage_index: number;
+  suppliers: SupplyChainSupplierDraft[];
+  /** Echo from report; server re-screens edited rows via the gov list. */
+  supplier_risk: SupplierRiskResult[];
+};
+
+/** Full report: supplier screening + regulatory section + supply-chain inference. */
 export type ReportResponse = {
   product_description: string;
   supplier_risk: SupplierRiskResult[];
   regulatory: RegulatorySection;
+  supply_chain: SupplyChainAnalysis;
 };

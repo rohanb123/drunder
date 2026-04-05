@@ -154,7 +154,12 @@ export function ReportView({ report }: { report: ReportResponse }) {
         <ul className="mt-4 divide-y divide-slate-100">
           {suppliersOrdered.map((r, idx) => (
             <li key={`${r.supplier_name}-${idx}`} className="flex flex-wrap items-baseline justify-between gap-2 py-3">
-              <span className="font-medium text-ink">{r.supplier_name}</span>
+              <div className="min-w-0 flex-1">
+                <span className="font-medium text-ink">{r.supplier_name}</span>
+                {(r.role ?? "").trim() ? (
+                  <p className="mt-0.5 text-xs text-ink-muted">Role: {(r.role ?? "").trim()}</p>
+                ) : null}
+              </div>
               <span
                 className={
                   r.status === "flagged"
