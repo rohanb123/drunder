@@ -12,7 +12,13 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import ListFlowable, ListItem, PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
-from app.schemas.report import ReportResponse, RegulatoryBullet, SupplierRiskResult, WhatIfPdfSection
+from app.schemas.report import (
+    ReportResponse,
+    RegulatoryBullet,
+    SupplierRiskResult,
+    SupplyChainStage,
+    WhatIfPdfSection,
+)
 
 _STATUS_ORDER = {"flagged": 0, "review": 1, "clear": 2}
 
@@ -164,6 +170,10 @@ def build_report_pdf(report: ReportResponse, what_if: WhatIfPdfSection | None = 
         status = escape(str(r.status))
         name = escape(r.supplier_name or "")
         story.append(Paragraph(f"<b>{name}</b> — <i>{status}</i>", body))
+        if (r.role or "").strip():
+            story.append(
+                _para(f"Description / role: {escape((r.role or '').strip())}", small),
+            )
         if r.notes:
             story.append(_para_markdown(r.notes, small))
         m = r.match
@@ -179,11 +189,48 @@ def build_report_pdf(report: ReportResponse, what_if: WhatIfPdfSection | None = 
                 story.append(_para("Aliases: " + "; ".join(m.aliases[:40]), small))
         story.append(Spacer(1, 0.05 * inch))
 
+    def _supply_chain_paragraphs(stages: list[SupplyChainStage]) -> None:
+        story.append(Paragraph("<b>Section 2 — Supply chain mapping</b>", h2))
+        story.append(
+            Paragraph(
+                "<i>Inferred stages (Gemini) from product + supplier roles; ok / broken / missing reflects "
+                "sanctions status at each stage.</i>",
+                small,
+            ),
+        )
+        if not stages:
+            story.append(
+                _para(
+                    "No supply chain stages were returned. Ensure GOOGLE_API_KEY is set on the API server.",
+                    body,
+                ),
+            )
+            story.append(Spacer(1, 0.08 * inch))
+            return
+        for st in stages:
+            status = escape(str(st.status))
+            title = escape(st.stage_name or "—")
+            story.append(Paragraph(f"<b>{title}</b> — <i>{status}</i>", body))
+            if st.note:
+                story.append(_para_markdown(st.note, small))
+            for sup in st.suppliers:
+                sn = escape(sup.name or "")
+                sr = escape(sup.role or "")
+                ss = escape(str(sup.sanctions_status))
+                line = f"• {sn}"
+                if sr:
+                    line += f" ({sr})"
+                line += f" — sanctions: {ss}"
+                story.append(_para(line, small))
+            story.append(Spacer(1, 0.05 * inch))
+
+    _supply_chain_paragraphs(report.supply_chain.stages)
+
     reg = report.regulatory
     cite_order = [c.chunk_id for c in reg.citations if c.chunk_id]
     cite_labels = {cid: f"Source {i + 1}" for i, cid in enumerate(cite_order)}
 
-    story.append(Paragraph("<b>Section 2 — Regulatory compliance</b>", h2))
+    story.append(Paragraph("<b>Section 3 — Regulatory compliance</b>", h2))
     story.append(_para(_truncate_pdf_text(_strip_markdown_for_pdf(reg.summary), 12_000), body))
 
     if reg.applicable_regulations:

@@ -1,23 +1,23 @@
-export type SentinelTab = "compliance" | "whatif";
+export type SentinelTab = "compliance" | "supplychain";
 
 type Props = {
   tab: SentinelTab;
   onTab: (t: SentinelTab) => void;
-  /** When false, the What-If tab is hidden until a compliance report has been generated. */
-  whatIfUnlocked: boolean;
+  /** When false, Supply chain tab is hidden until a compliance report exists. */
+  reportTabsUnlocked: boolean;
 };
 
-export function SentinelHeader({ tab, onTab, whatIfUnlocked }: Props) {
+export function SentinelHeader({ tab, onTab, reportTabsUnlocked }: Props) {
   const tabs: { id: SentinelTab; label: string }[] = [
     { id: "compliance", label: "Compliance report" },
-    ...(whatIfUnlocked ? [{ id: "whatif" as const, label: `"What-If" simulator` }] : []),
+    ...(reportTabsUnlocked ? [{ id: "supplychain" as const, label: "Supply chain" }] : []),
   ];
   return (
     <header className="border-b border-zinc-200 bg-white shadow-sm">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-zinc-900">Clearpath + Supply Chain Sentinel</h1>
-          <p className="text-xs text-zinc-500">Compliance reports and what-if simulation</p>
+          <p className="text-xs text-zinc-500">Compliance reports and supply chain mapping</p>
         </div>
       </div>
       <nav className="mx-auto flex max-w-7xl gap-1 px-6">

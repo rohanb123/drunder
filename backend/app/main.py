@@ -6,8 +6,15 @@ from fastapi.responses import FileResponse, Response
 
 from app.config import get_settings
 from app.routers import sentinel as sentinel_router
-from app.schemas.report import ReportPdfRequest, ReportRequest, ReportResponse
+from app.schemas.report import (
+    ReportPdfRequest,
+    ReportRequest,
+    ReportResponse,
+    SupplyChainAnalysis,
+    SupplyChainStageUpdateRequest,
+)
 from app.services.orchestrator import build_unified_report
+from app.services.supply_chain_refine import refine_supply_chain_after_stage_edit
 from app.services.regulatory_paths import resolve_regulatory_pdf_safe, resolve_under_backend
 from app.services.report_pdf import build_report_pdf
 
@@ -57,6 +64,15 @@ async def get_regulatory_source_pdf(
         filename=file_path.name,
         headers={"Content-Disposition": f'inline; filename="{file_path.name}"'},
     )
+
+
+@app.post("/report/supply-chain/update-stage", response_model=SupplyChainAnalysis)
+async def update_supply_chain_stage(body: SupplyChainStageUpdateRequest) -> SupplyChainAnalysis:
+    """Re-screen edited suppliers (gov list path), then one Gemini call to refactor the full chain when configured."""
+    try:
+        return await refine_supply_chain_after_stage_edit(body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.post("/report", response_model=ReportResponse)

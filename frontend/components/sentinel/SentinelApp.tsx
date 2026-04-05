@@ -1,7 +1,7 @@
 "use client";
 
 import { ComplianceTab } from "./tabs/ComplianceTab";
-import { WhatIfTab } from "./tabs/WhatIfTab";
+import { SupplyChainTab } from "./tabs/SupplyChainTab";
 import { SentinelHeader } from "./SentinelHeader";
 import { useSentinelState } from "./useSentinelState";
 
@@ -10,7 +10,7 @@ export function SentinelApp() {
 
   return (
     <div className="min-h-screen bg-zinc-100 text-zinc-900">
-      <SentinelHeader tab={s.tab} onTab={s.setTab} whatIfUnlocked={s.complianceReport != null} />
+      <SentinelHeader tab={s.tab} onTab={s.setTab} reportTabsUnlocked={s.complianceReport != null} />
       <main className="mx-auto max-w-7xl px-6 py-8">
         {s.tab === "compliance" && (
           <ComplianceTab
@@ -30,24 +30,12 @@ export function SentinelApp() {
             onDownloadPdf={() => void s.downloadCompliancePdf()}
           />
         )}
-        {s.tab === "whatif" && (
-          <WhatIfTab
-            baselineSuppliers={s.whatIfSuppliers}
-            addBaselineRow={s.addWhatIfSupplierRow}
-            updateBaselineRow={s.updateWhatIfSupplierRow}
-            removeBaselineRow={s.removeWhatIfSupplierRow}
-            event={s.event}
-            setEvent={s.setEvent}
-            streaming={s.streaming}
-            runWhatIf={() => void s.runWhatIf()}
-            narrative={s.narrative}
-            result={s.result}
-            streamErr={s.streamErr}
-            parseErr={s.parseErr}
-            onUnifiedPdf={() => void s.requestUnifiedPdf()}
-            unifiedPdfBusy={s.compliancePdfLoading}
-            showUnifiedPdfButton={s.whatIfRunCompleted}
-            complianceError={s.complianceError}
+        {s.tab === "supplychain" && s.complianceReport && (
+          <SupplyChainTab
+            productDescription={s.complianceReport.product_description}
+            analysis={s.complianceReport.supply_chain ?? { stages: [] }}
+            supplierRisk={s.complianceReport.supplier_risk}
+            onSupplyChainUpdated={s.mergeSupplyChain}
           />
         )}
       </main>

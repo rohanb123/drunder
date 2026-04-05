@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Clearpath — Compliance & supply chain sentinel",
   description:
-    "Sanctions screening, regulatory guidance, Chroma-backed supply profiles, and what-if simulation.",
+    "Sanctions screening, regulatory guidance, and supply chain mapping.",
 };
 
 export default function RootLayout({
