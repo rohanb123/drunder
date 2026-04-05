@@ -19,6 +19,7 @@ from app.config import Settings, get_settings
 from app.schemas.report import MatchedListEntry, SupplierInput, SupplierRiskResult
 from app.services.csl_client import search_consolidated_screening_list
 from app.services.sanctions_gemini import assess_supplier_when_csl_empty
+from app.services.sanctions_name_filter import filter_csl_hits_by_similarity
 
 
 def _normalize_name(s: str) -> str:
@@ -64,10 +65,13 @@ def _first_valid_hit(results: list[dict[str, Any]]) -> dict[str, Any] | None:
 def classify_supplier_from_csl_results(
     supplier_name: str,
     raw_results: list[dict[str, Any]],
+    *,
+    hit_scores: list[float] | None = None,
 ) -> SupplierRiskResult:
     """
     Iterate CSL `results` only (no Gemini). Exact name/alias match → flagged.
     Non-empty list but no exact match → review (API surfaced possible matches).
+    hit_scores[i] parallels raw_results[i] when provided (for fuzzy_score on review).
     """
     qn = _normalize_name(supplier_name)
     for hit in raw_results:
@@ -79,10 +83,7 @@ def classify_supplier_from_csl_results(
                 status="flagged",
                 match=_hit_to_match(hit),
                 fuzzy_score=None,
-                notes=(
-                    "CSL returned an entry whose primary name or alias exactly matches the supplier name "
-                    "(normalized)."
-                ),
+                notes="This name matches a U.S. sanctions list entry (including aliases).",
             )
 
     first = _first_valid_hit(raw_results)
@@ -92,16 +93,17 @@ def classify_supplier_from_csl_results(
             status="review",
             match=None,
             fuzzy_score=None,
-            notes="CSL returned payload without parseable entity rows; manual review recommended.",
+            notes="We couldn't read these screening results. Please review manually.",
         )
+    fs = float(hit_scores[0]) if hit_scores and len(hit_scores) == len(raw_results) else None
     return SupplierRiskResult(
         supplier_name=supplier_name,
         status="review",
         match=_hit_to_match(first),
-        fuzzy_score=None,
+        fuzzy_score=fs,
         notes=(
-            "CSL returned one or more list entries for this search, but none exactly match the supplier name "
-            "(normalized). The API’s own search surfaced these rows — verify before treating as clearance."
+            "Similar names turned up on the U.S. list, but none exactly match your supplier. "
+            "Review the hit below before treating this as cleared."
         ),
     )
 
@@ -110,19 +112,30 @@ async def _gemini_when_csl_empty(
     supplier_name: str,
     settings: Settings,
     *,
-    extra_note: str | None = None,
+    official_list_ran: bool = True,
 ) -> SupplierRiskResult:
+    """
+    No rows from the government list (or list wasn't queried). Optional secondary name review.
+    official_list_ran=False means list credentials missing — user-facing copy stays non-technical.
+    """
     gkey = (settings.google_api_key or "").strip()
     if not gkey:
-        msg = "CSL returned no rows and GOOGLE_API_KEY is not set; Gemini fallback skipped."
-        if extra_note:
-            msg = f"{msg} {extra_note}"
+        if official_list_ran:
+            msg = (
+                "No matches on the official U.S. sanctions list for this spelling. "
+                "A secondary name review isn't available here—confirm the legal entity yourself if unsure."
+            )
+        else:
+            msg = (
+                "Official sanctions list search isn't connected. "
+                "No secondary review ran—treat screening as incomplete until your organization enables it."
+            )
         return SupplierRiskResult(
             supplier_name=supplier_name,
             status="review",
             match=None,
             fuzzy_score=None,
-            notes=msg.strip(),
+            notes=msg,
         )
     try:
         status, reason = await asyncio.to_thread(
@@ -131,23 +144,26 @@ async def _gemini_when_csl_empty(
             api_key=gkey,
             model=settings.gemini_sanctions_model,
         )
-    except Exception as e:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         return SupplierRiskResult(
             supplier_name=supplier_name,
             status="review",
             match=None,
             fuzzy_score=None,
-            notes=f"CSL returned no rows; Gemini fallback failed: {e!s}",
+            notes="Secondary name review didn't finish. Try again, or rely on the list search result only.",
         )
-    notes = reason or "CSL returned no rows; Gemini assessment applied."
-    if extra_note:
-        notes = f"{notes} {extra_note}"
+    default = (
+        "No matches on the official list. A short name review was applied."
+        if official_list_ran
+        else "List search wasn't used; a short name review was applied."
+    )
+    notes = (reason or default).strip()
     return SupplierRiskResult(
         supplier_name=supplier_name,
         status=status,
         match=None,
         fuzzy_score=None,
-        notes=notes.strip(),
+        notes=notes,
     )
 
 
@@ -164,16 +180,12 @@ async def _screen_one_supplier(
             status="review",
             match=None,
             fuzzy_score=None,
-            notes="Supplier name is empty after trimming.",
+            notes="Please enter a supplier name.",
         )
 
     key = (settings.trade_gov_api_key or "").strip()
     if not key:
-        return await _gemini_when_csl_empty(
-            name,
-            settings,
-            extra_note="(TRADE_GOV_API_KEY not set; CSL not queried.)",
-        )
+        return await _gemini_when_csl_empty(name, settings, official_list_ran=False)
 
     try:
         raw_results = await search_consolidated_screening_list(
@@ -182,32 +194,35 @@ async def _screen_one_supplier(
             name=name,
             search_url=settings.trade_gov_csl_search_url,
         )
-    except httpx.HTTPStatusError as e:
-        detail = ""
-        try:
-            detail = e.response.text[:300]
-        except Exception:
-            pass
+    except httpx.HTTPStatusError:
         return SupplierRiskResult(
             supplier_name=name,
             status="review",
             match=None,
             fuzzy_score=None,
-            notes=f"Trade.gov CSL request failed (HTTP {e.response.status_code}). {detail}".strip(),
+            notes="Screening couldn't be completed right now. Please try again later.",
         )
-    except httpx.RequestError as e:
+    except httpx.RequestError:
         return SupplierRiskResult(
             supplier_name=name,
             status="review",
             match=None,
             fuzzy_score=None,
-            notes=f"Trade.gov CSL network error: {e!s}",
+            notes="We couldn't reach the screening service. Check your connection and try again.",
         )
 
     if not raw_results:
-        return await _gemini_when_csl_empty(name, settings)
+        return await _gemini_when_csl_empty(name, settings, official_list_ran=True)
 
-    return classify_supplier_from_csl_results(name, raw_results)
+    filtered, scores = filter_csl_hits_by_similarity(
+        raw_results,
+        name,
+        min_similarity=settings.sanctions_name_similarity_threshold,
+    )
+    if not filtered:
+        return await _gemini_when_csl_empty(name, settings, official_list_ran=True)
+
+    return classify_supplier_from_csl_results(name, filtered, hit_scores=scores)
 
 
 async def run_supplier_screening(suppliers: list[SupplierInput]) -> list[SupplierRiskResult]:

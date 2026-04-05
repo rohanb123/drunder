@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     trade_gov_api_key: str = ""
     # Full URL for CSL search (ITA Data Services; default is production).
     trade_gov_csl_search_url: str = "https://data.trade.gov/consolidated_screening_list/v1/search"
+    # Drop weak CSL fuzzy hits: keep exact matches always; else require similarity >= this (0–1).
+    sanctions_name_similarity_threshold: float = 0.78
     google_api_key: str = ""
     # Cheapest GA Flash-class tier per Google: gemini-2.5-flash-lite (budget / high-volume).
     # Override with gemini-2.5-flash in .env for stronger reasoning at higher $/token.

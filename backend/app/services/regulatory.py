@@ -33,8 +33,7 @@ def _run_regulatory_rag_sync(product_description: str) -> RegulatorySection:
             return synthesize_regulatory_section(product_description, [], api_key="")
         return RegulatorySection(
             summary=(
-                "Retrieved top guidance excerpts from the local index, but GOOGLE_API_KEY is not set; "
-                "Gemini synthesis is skipped. Use citations below (from chunk metadata)."
+                "Guidance excerpts below apply to your product. A written overview isn't available in this session."
             ),
             applicable_regulations=[],
             testing_requirements=[],
@@ -53,13 +52,10 @@ def _run_regulatory_rag_sync(product_description: str) -> RegulatorySection:
     except Exception as e:  # noqa: BLE001 — quota/network/API errors from google.genai
         if not chunks:
             return synthesize_regulatory_section(product_description, [], api_key="")
-        err = str(e).strip()
-        if len(err) > 600:
-            err = err[:600] + "…"
         return RegulatorySection(
             summary=(
-                f"Retrieved {len(chunks)} excerpt(s) from the local index, but Gemini synthesis failed "
-                f"(quota, billing, or API error). Citations below are from Chroma metadata. Detail: {err}"
+                f"We couldn't generate a full written overview for your product. "
+                f"The {len(chunks)} source reference(s) below are still available."
             ),
             applicable_regulations=[],
             testing_requirements=[],

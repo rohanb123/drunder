@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -7,6 +9,7 @@ from app.schemas.report import ReportRequest, ReportResponse
 from app.services.orchestrator import build_unified_report
 from app.services.report_pdf import build_report_pdf
 
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Clearpath API",
@@ -34,14 +37,25 @@ async def create_report(body: ReportRequest) -> ReportResponse:
     """Product + suppliers → sanctions screening + regulatory section (unified JSON)."""
     try:
         return await build_unified_report(body)
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception:  # noqa: BLE001
+        logger.exception("Report generation failed")
+        raise HTTPException(
+            status_code=500,
+            detail="We couldn't generate this report. Please try again in a moment.",
+        ) from None
 
 
 @app.post("/report/pdf")
 async def create_report_pdf(body: ReportRequest) -> Response:
     """Same inputs as /report; returns application/pdf (ReportLab)."""
-    report = await build_unified_report(body)
+    try:
+        report = await build_unified_report(body)
+    except Exception:  # noqa: BLE001
+        logger.exception("PDF report generation failed")
+        raise HTTPException(
+            status_code=500,
+            detail="We couldn't generate this PDF. Please try again in a moment.",
+        ) from None
     pdf_bytes = build_report_pdf(report)
     return Response(
         content=pdf_bytes,

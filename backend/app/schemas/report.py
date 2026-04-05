@@ -7,10 +7,6 @@ class SupplierInput(BaseModel):
     """One supplier row from the form or parsed CSV."""
 
     name: str = Field(..., description="Legal or trade name to screen")
-    country_of_origin: str = Field(
-        default="",
-        description="Country of origin when provided by the CSV (optional for screening)",
-    )
 
 
 class ReportRequest(BaseModel):
@@ -44,10 +40,17 @@ class RegulatoryCitation(BaseModel):
     chunk_id: str | None = None
 
 
+class RegulatoryBullet(BaseModel):
+    """One regulatory bullet with optional links to citation chunk_ids."""
+
+    text: str
+    citation_chunk_ids: list[str] = Field(default_factory=list)
+
+
 class RegulatorySection(BaseModel):
     summary: str
-    applicable_regulations: list[str] = Field(default_factory=list)
-    testing_requirements: list[str] = Field(default_factory=list)
+    applicable_regulations: list[RegulatoryBullet] = Field(default_factory=list)
+    testing_requirements: list[RegulatoryBullet] = Field(default_factory=list)
     estimated_compliance_cost_usd: float | None = None
     penalty_exposure_note: str | None = None
     citations: list[RegulatoryCitation] = Field(default_factory=list)

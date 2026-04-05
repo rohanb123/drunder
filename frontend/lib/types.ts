@@ -1,8 +1,7 @@
-/** Mirrors backend `app/schemas/report.py` for typed fetch responses. */
+/** Shapes returned by the report service (aligned with server models). */
 
 export type SupplierInput = {
   name: string;
-  country_of_origin: string;
 };
 
 export type ReportRequest = {
@@ -26,33 +25,31 @@ export type SupplierRiskResult = {
   notes: string | null;
 };
 
-export type TariffExposureResult = {
-  supplier_name: string;
-  country_of_origin: string;
-  hts_chapter: string;
-  duty_rate_percent: number | null;
-  api_source: string;
-};
-
 export type RegulatoryCitation = {
   title: string;
   source: string;
+  cfr_citation: string | null;
   document_id: string | null;
   chunk_id: string | null;
 };
 
+export type RegulatoryBullet = {
+  text: string;
+  citation_chunk_ids: string[];
+};
+
 export type RegulatorySection = {
   summary: string;
-  applicable_regulations: string[];
-  testing_requirements: string[];
+  applicable_regulations: RegulatoryBullet[];
+  testing_requirements: RegulatoryBullet[];
   estimated_compliance_cost_usd: number | null;
   penalty_exposure_note: string | null;
   citations: RegulatoryCitation[];
 };
 
+/** Full report: supplier screening + regulatory section. */
 export type ReportResponse = {
   product_description: string;
   supplier_risk: SupplierRiskResult[];
-  tariff_exposure: TariffExposureResult[];
   regulatory: RegulatorySection;
 };

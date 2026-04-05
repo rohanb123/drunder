@@ -2,7 +2,9 @@ import type { ReportRequest, ReportResponse } from "./types";
 
 function baseUrl(): string {
   const u = process.env.NEXT_PUBLIC_API_URL;
-  if (!u) throw new Error("Set NEXT_PUBLIC_API_URL (see .env.local.example)");
+  if (!u) {
+    throw new Error("This app isn't configured to reach the report service. Contact your administrator.");
+  }
   return u.replace(/\/$/, "");
 }
 
@@ -13,8 +15,8 @@ export async function postReport(body: ReportRequest): Promise<ReportResponse> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `Report failed: ${res.status}`);
+    await res.text().catch(() => {});
+    throw new Error("We couldn't complete your report. Please try again in a moment.");
   }
   return res.json() as Promise<ReportResponse>;
 }
@@ -26,8 +28,8 @@ export async function postReportPdf(body: ReportRequest): Promise<Blob> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `PDF failed: ${res.status}`);
+    await res.text().catch(() => {});
+    throw new Error("We couldn't generate the PDF. Please try again in a moment.");
   }
   return res.blob();
 }

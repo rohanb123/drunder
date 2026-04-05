@@ -17,26 +17,30 @@ def assess_supplier_when_csl_empty(
     model: str = "gemini-2.5-flash-lite",
 ) -> tuple[Status, str | None]:
     """
-    CSL search returned zero results. Ask Gemini whether the name still suggests sanctions risk.
-
-    Returns (status, notes). Prefer review when uncertain; flag only for clear-cut cases.
+    CSL search returned zero results. Ask Gemini whether the **supplier name** (third party)
+    still warrants extra sanctions diligence—without accusing the customer company of wrongdoing.
     """
     from app.services.gemini_generate import generate_text
 
-    prompt = f"""You are assisting with export/sanctions compliance pre-screening.
+    prompt = f"""You support **supplier due diligence** for importers and manufacturers. They paste a **vendor or supplier legal name** to screen; you are **not** judging their company—you are commenting only on **whether this name string** merits extra review when the U.S. Trade.gov Consolidated Screening List API returned **no hits** ({CSL_API_DOCS}).
 
-The U.S. Trade.gov Consolidated Screening List search API ({CSL_API_DOCS}) returned **zero** results for this supplier name:
+**Supplier name to assess (third party, not the user’s company):**
 "{supplier_name}"
 
-Without inventing specific list matches or citations, assess whether this name (or an obvious variant) is **likely** to refer to a widely known heavily sanctioned entity, a military/industrial complex name under U.S. restrictions, or a state actor commonly associated with OFAC/BIS-style lists.
+Assess **only** that string. Consider: typos, look-alike spellings, ambiguous names, or resemblance to **widely known sanctioned / restricted parties** (OFAC SDN-style, etc.).
 
-Respond with **JSON only**, no markdown, in this exact shape:
-{{"status":"clear"|"review"|"flagged","reason":"one short sentence"}}
+**Tone (critical):**
+- Write about **the supplier name**, never accuse the **company running this check** of evasion, fraud, or bad intent.
+- If the name **closely resembles a famous ordinary commercial brand** (e.g. a misspelling of a major software or consumer brand) with **no** plausible link to a sanctions-listed entity, treat it as **likely a typo or wrong entity** → **"clear"** or **"review"** with a **neutral** note (e.g. confirm the intended legal entity spelling)—**not** "flagged" and **not** language about "deliberate evasion."
+- **"flagged"** only when the name would reasonably suggest a **known heavily sanctioned or clearly restricted party**—not merely a misspelled famous company that is **not** a sanctions target.
+
+Respond with **JSON only**, no markdown:
+{{"status":"clear"|"review"|"flagged","reason":"one short neutral sentence about the supplier name only"}}
 
 Rules:
-- "flagged" only if the name clearly points to a well-known sanctioned / restricted party.
-- "review" if there is meaningful ambiguity or the name could plausibly relate to a restricted party.
-- "clear" for ordinary commercial names with no plausible sanctions concern.
+- "flagged": only for clear-cut sanctions-style risk from the **name itself**.
+- "review": ambiguity, unclear spelling, or suggest double-checking the legal entity.
+- "clear": ordinary commercial name, or obvious benign typo of a non-sanctions household name with no sanctions nexus.
 """
     text = generate_text(
         api_key=api_key,
@@ -51,14 +55,14 @@ Rules:
 def _parse_gemini_status(text: str) -> tuple[Status, str | None]:
     start = text.find("{")
     if start < 0:
-        return "review", "Gemini fallback returned unparsable output; manual review recommended."
+        return "review", "That review step returned unreadable output. Try again or decide manually."
     try:
         obj, _ = json.JSONDecoder().raw_decode(text[start:])
     except json.JSONDecodeError:
-        return "review", "Gemini fallback returned invalid JSON; manual review recommended."
+        return "review", "That review step returned invalid data. Try again or decide manually."
     raw = str(obj.get("status", "")).lower().strip()
     if raw not in ("clear", "review", "flagged"):
-        return "review", "Gemini fallback returned unknown status; manual review recommended."
+        return "review", "That review step returned an unclear result. Decide manually."
     reason = obj.get("reason")
     note = str(reason).strip() if reason else None
     return raw, note

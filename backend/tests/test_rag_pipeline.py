@@ -47,6 +47,7 @@ def test_citations_from_chunks_preserves_metadata() -> None:
     assert cites[0].source == "FTC"
     assert cites[0].document_id == "Health-Products-Compliance-Guidance"
     assert cites[0].chunk_id == "abc_1"
+    assert cites[0].title == "FTC — Health Products, p. 3"
 
 
 @pytest.mark.skipif(not CHROMA_DIR.is_dir(), reason="chroma_db/ not present (run ingest first)")
@@ -83,8 +84,8 @@ def test_synthesize_regulatory_section_parses_json(mock_gen: MagicMock) -> None:
 
     mock_gen.return_value = """{
   "summary": "Test summary grounded in excerpts.",
-  "applicable_regulations": ["Rule A"],
-  "testing_requirements": ["Test B"],
+  "applicable_regulations": ["Acute toxicity reporting under the compliance rule (Excerpt 1, doc1)"],
+  "testing_requirements": ["Submit studies on ingredient combinations when experts require product-level data (Excerpt 1, doc1)"],
   "estimated_compliance_cost_usd": null,
   "penalty_exposure_note": null,
   "citations": [
@@ -100,7 +101,10 @@ def test_synthesize_regulatory_section_parses_json(mock_gen: MagicMock) -> None:
     chunks = [
         RetrievedChunk(
             id="chunk-1",
-            text="Excerpt text for compliance.",
+            text=(
+                "The compliance rule requires acute toxicity reporting for certain products. "
+                "Studies on individual ingredients may not suffice; experts may require product-level studies."
+            ),
             metadata={
                 "source_agency": "FTC",
                 "document_id": "doc1",
@@ -118,7 +122,13 @@ def test_synthesize_regulatory_section_parses_json(mock_gen: MagicMock) -> None:
     )
     assert isinstance(section, RegulatorySection)
     assert "Test summary" in section.summary
-    assert section.applicable_regulations == ["Rule A"]
+    assert len(section.applicable_regulations) == 1
+    assert section.applicable_regulations[0].text == "Acute toxicity reporting under the compliance rule"
+    assert section.applicable_regulations[0].citation_chunk_ids == ["chunk-1"]
+    assert len(section.testing_requirements) == 1
+    t0 = section.testing_requirements[0].text.lower()
+    assert "ingredient" in t0 or "product" in t0
+    assert section.testing_requirements[0].citation_chunk_ids == ["chunk-1"]
     assert len(section.citations) >= 1
     assert section.citations[0].chunk_id == "chunk-1"
 
