@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, Response
 
 from app.config import get_settings
 from app.routers import sentinel as sentinel_router
+from app.routers import browser_agent as browser_agent_router
 from app.schemas.report import (
     ReportPdfRequest,
     ReportRequest,
@@ -36,6 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(sentinel_router.router)
+app.include_router(browser_agent_router.router)
 
 
 @app.get("/health")

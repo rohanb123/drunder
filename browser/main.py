@@ -19,9 +19,9 @@ from rich.console import Console
 from rich.panel import Panel
 
 load_dotenv()
-console = Console()
+console = Console() 
 
-SUPPLY_URL = "https://supply-chain-dashboard-eight.vercel.app"
+SUPPLY_URL = "https://supply-chain-dashboard-eight.vercel.app/suppliers"
 
 
 def get_inputs(args) -> tuple[str, str]:

@@ -1,4 +1,4 @@
-export type SentinelTab = "compliance" | "supplychain";
+export type SentinelTab = "compliance" | "supplychain" | "browser";
 
 type Props = {
   tab: SentinelTab;
@@ -11,6 +11,7 @@ export function SentinelHeader({ tab, onTab, reportTabsUnlocked }: Props) {
   const tabs: { id: SentinelTab; label: string }[] = [
     { id: "compliance", label: "Compliance report" },
     ...(reportTabsUnlocked ? [{ id: "supplychain" as const, label: "Supply chain" }] : []),
+    { id: "browser", label: "Dashboard agent" },
   ];
   return (
     <header className="border-b border-zinc-200 bg-white shadow-sm">

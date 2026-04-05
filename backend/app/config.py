@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    browser_use_api_key: str = ""
     trade_gov_api_key: str = ""
     # Full URL for CSL search (ITA Data Services; default is production).
     trade_gov_csl_search_url: str = "https://data.trade.gov/consolidated_screening_list/v1/search"

@@ -58,6 +58,7 @@ export function useSentinelState() {
     [complianceReport],
   );
 
+
   useEffect(() => {
     if (!complianceReport && tab === "supplychain") {
       setTabInner("compliance");
