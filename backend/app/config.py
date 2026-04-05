@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     # Full URL for CSL search (ITA Data Services; default is production).
     trade_gov_csl_search_url: str = "https://data.trade.gov/consolidated_screening_list/v1/search"
     google_api_key: str = ""
-    # Use a model your AI Studio project has quota for (2.0-flash often shows limit:0 on free tier).
+    # Cheapest GA Flash-class tier per Google: gemini-2.5-flash-lite (budget / high-volume).
+    # Override with gemini-2.5-flash in .env for stronger reasoning at higher $/token.
     gemini_sanctions_model: str = "gemini-2.5-flash-lite"
     gemini_regulatory_model: str = "gemini-2.5-flash-lite"
     # Regulatory RAG (paths relative to backend/ unless absolute)

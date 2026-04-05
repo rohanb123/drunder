@@ -43,12 +43,30 @@ def _run_regulatory_rag_sync(product_description: str) -> RegulatorySection:
             citations=citations_from_chunks(chunks),
         )
 
-    return synthesize_regulatory_section(
-        product_description,
-        chunks,
-        api_key=gkey,
-        model=settings.gemini_regulatory_model,
-    )
+    try:
+        return synthesize_regulatory_section(
+            product_description,
+            chunks,
+            api_key=gkey,
+            model=settings.gemini_regulatory_model,
+        )
+    except Exception as e:  # noqa: BLE001 — quota/network/API errors from google.genai
+        if not chunks:
+            return synthesize_regulatory_section(product_description, [], api_key="")
+        err = str(e).strip()
+        if len(err) > 600:
+            err = err[:600] + "…"
+        return RegulatorySection(
+            summary=(
+                f"Retrieved {len(chunks)} excerpt(s) from the local index, but Gemini synthesis failed "
+                f"(quota, billing, or API error). Citations below are from Chroma metadata. Detail: {err}"
+            ),
+            applicable_regulations=[],
+            testing_requirements=[],
+            estimated_compliance_cost_usd=None,
+            penalty_exposure_note=None,
+            citations=citations_from_chunks(chunks),
+        )
 
 
 async def run_regulatory_rag(product_description: str) -> RegulatorySection:
