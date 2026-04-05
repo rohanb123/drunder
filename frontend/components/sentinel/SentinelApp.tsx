@@ -37,9 +37,15 @@ export function SentinelApp() {
             analysis={s.complianceReport.supply_chain ?? { stages: [] }}
             supplierRisk={s.complianceReport.supplier_risk}
             onSupplyChainUpdated={s.mergeSupplyChain}
+            onTakeAction={s.prefillBrowserAgent}
           />
         )}
-        {s.tab === "browser" && <BrowserAgentTab />}
+        {s.tab === "browser" && (
+          <BrowserAgentTab
+            initialCompany={s.browserPrefill?.company}
+            initialNote={s.browserPrefill?.note}
+          />
+        )}
       </main>
     </div>
   );

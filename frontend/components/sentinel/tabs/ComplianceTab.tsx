@@ -5,6 +5,16 @@ import type { ReportResponse, SupplierInput } from "@/lib/types";
 
 type SupplierRow = SupplierInput;
 
+const EXAMPLE_PRODUCT =
+  "Steel water bottles with bamboo lids, sold in US retail channels. Manufactured in China and Vietnam, co-packed in Mexico.";
+
+const EXAMPLE_SUPPLIERS: SupplierInput[] = [
+  { name: "Zhejiang Metal Works Co.", role: "Primary manufacturer of stainless steel bottle bodies" },
+  { name: "Nguyen Packaging Ltd", role: "Vietnamese co-manufacturer for bamboo lid assembly" },
+  { name: "Baja Co-Pack S.A.", role: "Mexican co-packer for final assembly and labeling" },
+  { name: "SinoChem Trading", role: "Chemicals supplier for surface coating and lacquers" },
+];
+
 type Props = {
   productDescription: string;
   setProductDescription: (v: string) => void;
@@ -38,12 +48,35 @@ export function ComplianceTab({
   onGenerateReport,
   onDownloadPdf,
 }: Props) {
+  function loadExample() {
+    setProductDescription(EXAMPLE_PRODUCT);
+    // Replace all rows with example suppliers
+    // We do this by updating each existing row then adding new ones
+    EXAMPLE_SUPPLIERS.forEach((s, i) => updateSupplierRow(i, s));
+    // Add remaining rows if needed (we have 4 examples, default starts with 1)
+    for (let i = suppliers.length; i < EXAMPLE_SUPPLIERS.length; i++) {
+      addSupplierRow();
+    }
+  }
+
   return (
     <div className="space-y-8">
       {!report && (
         <div className="space-y-8 rounded-2xl border border-slate-200 bg-surface-card p-6 shadow-sm">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">Compliance report</h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-ink">Compliance report</h2>
+              <p className="mt-1 text-xs text-ink-muted">
+                Sanctions screening · Regulatory analysis · Supply chain mapping
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadExample}
+              className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-100"
+            >
+              Try example
+            </button>
           </div>
 
           {complianceError && (
@@ -60,7 +93,7 @@ export function ComplianceTab({
               id="compliance-product"
               rows={4}
               className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              placeholder='e.g. Cold-brew coffee concentrate in glass bottles, US nationwide…'
+              placeholder="e.g. Cold-brew coffee concentrate in glass bottles, US nationwide…"
               value={productDescription}
               onChange={(e) => setProductDescription(e.target.value)}
             />
